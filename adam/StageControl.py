@@ -3,6 +3,8 @@ import sys
 import code
 
 
+# This handles the motion of the motorized stage as well as reading
+# data from the stage (in order to determine stage position).
 class StageController:
 	def __init__(self, port="COM3", baud=9600, timeout=0.01):
 		self.connection = serial.Serial(port, baud, timeout=timeout)
