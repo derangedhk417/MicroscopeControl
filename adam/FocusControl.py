@@ -93,6 +93,10 @@ class FocusController:
 
 		return zoom_limit, focus_limit
 
+	# Returns zoom_limit, focus_limit
+	def getLimits(self):
+		return self._read_limits()
+
 	# Read data from the serial port until a complete response has been
 	# sent. The response is terminated with "$ ", so this function returns
 	# when it reads that. It does NOT retur the final "$ ".
@@ -279,6 +283,14 @@ class FocusController:
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
 
+		# Read the current position and modify the increment to ensure that
+		# we don't overrun the motor limit.
+
+		current_zoom = self.getZoom()
+
+		if current_zoom + value > 1.0:
+			value = 1.0 - current_zoom
+
 		value  = value * (self.zoom_range[1] - self.zoom_range[0])
 		value += self.zoom_range[0]
 		value  = int(round(value))
@@ -296,6 +308,15 @@ class FocusController:
 	def incrementFocus(self, value):
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
+
+
+		# Read the current position and modify the increment to ensure that
+		# we don't overrun the motor limit.
+
+		current_focus = self.getFocus()
+
+		if current_focus + value > 1.0:
+			value = 1.0 - current_focus
 
 		value  = value * (self.focus_range[1] - self.focus_range[0])
 		value += self.focus_range[0]
