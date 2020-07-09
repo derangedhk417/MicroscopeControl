@@ -290,6 +290,8 @@ class FocusController:
 
 		if current_zoom + value > 1.0:
 			value = 1.0 - current_zoom
+		elif current_zoom + value < 0.0:
+			value = -current_zoom
 
 		value  = value * (self.zoom_range[1] - self.zoom_range[0])
 		value += self.zoom_range[0]
@@ -302,7 +304,7 @@ class FocusController:
 		value    = self._parse_response(response, command_str)
 
 		self._wait_for_idle('zoom')
-		return value
+		return int(value[1])
 
 	# Change the current focus by the specified value.
 	def incrementFocus(self, value):
@@ -317,6 +319,8 @@ class FocusController:
 
 		if current_focus + value > 1.0:
 			value = 1.0 - current_focus
+		elif current_focus + value < 0.0:
+			value = -current_focus
 
 		value  = value * (self.focus_range[1] - self.focus_range[0])
 		value += self.focus_range[0]
@@ -329,7 +333,7 @@ class FocusController:
 		value    = self._parse_response(response, command_str)
 
 		self._wait_for_idle('focus')
-		return value
+		return int(value[1])
 
 	# Set the position of the zoom motor. By default, this will home the
 	# zoom motor to position zero before moving to the requested position. 
