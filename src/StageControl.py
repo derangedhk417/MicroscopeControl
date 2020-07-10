@@ -5,6 +5,8 @@
 
 import serial
 import sys
+import time
+import threading
 import code
 
 # This handles the motion of the motorized stage as well as reading
@@ -67,8 +69,26 @@ class StageController:
 
 		return moving == 1
 
+	# This function will block until both axes are in the idle state.
+	# It will user the serial connection to check the axis status every
+	# "interval" seconds and will throw an exception after "timeout" seconds,
+	# if both axes have not reached the idle state.
+	def _wait_for_idle(self, interval=0.05, timeout=30):
+		start = time.time_ns()
+
+		while True:
+			if self.getAxisStatus('x') or self.getAxisStatus('y'):
+				time.sleep(interval)
+			else:
+				break
+
+			if (time.time_ns() - start) / 1e9 >= timeout:
+				msg = """Timeout of %f seconds exceeded while waiting for motor 
+				to reach idle state."""
+				raise Exception(msg%timeout)
+
 	# Move the stage position to the given value in millimeters.
-	def moveTo(self, x, y):
+	def moveTo(self, x, y, callback=None):
 		x = int(round(x * 10000))
 		y = int(round(y * 10000))
 
@@ -79,13 +99,31 @@ class StageController:
 		response      = self.readResponse()
 		response_data = self._parse_response(response)
 
-	def moveDelta(self, x, y):
+		if callback is None:
+			self._wait_for_idle()
+		else:
+			def complete_operation():
+				self._wait_for_idle()
+				callback()
+			wait_thread = threading.Thread(target=complete_operation)
+			wait_thread.start()
+
+	def moveDelta(self, x, y, callback=None):
 		command_string = b"R X=%d Y=%d Z \r"%(x * 10000, y * 10000)
 
 		self.connection.write(command_string)
 
 		response      = self.readResponse()
 		response_data = self._parse_response(response)
+
+		if callback is None:
+			self._wait_for_idle()
+		else:
+			def complete_operation():
+				self._wait_for_idle()
+				callback()
+			wait_thread = threading.Thread(target=complete_operation)
+			wait_thread.start()
 
 	# Set the amount of time in milliseconds that it should take for the
 	# axis to go from the start velocity to the maximum velocity.
@@ -148,10 +186,19 @@ class StageController:
 		response_data = self._parse_response(response)
 
 	# Resets the position of the stage.
-	def home(self):
+	def home(self, callback=None):
 		self.connection.write(b'MOVE X=0 Y=0 \r')
 		response      = self.readResponse()
 		response_data = self._parse_response(response)
+
+		if callback is None:
+			self._wait_for_idle()
+		else:
+			def complete_operation():
+				self._wait_for_idle()
+				callback()
+			wait_thread = threading.Thread(target=complete_operation)
+			wait_thread.start()
 
 
 	# Returns the X and Y positions in millimeters.

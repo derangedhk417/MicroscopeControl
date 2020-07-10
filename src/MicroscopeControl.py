@@ -2,9 +2,7 @@
 # Description: This class combines the functionality of the CameraController,
 #              FocusController and StageController classes into a cohesive
 #              class that performs all of the relevant work related to controlling
-#              the microscope. In particular, it implements asynchronous calls to 
-#              most of the functionality so that this class can be used in a UI
-#              program without causing it to hang.
+#              the microscope. 
 
 from CameraControl import CameraController
 from FocusControl  import FocusController
