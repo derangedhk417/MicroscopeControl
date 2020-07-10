@@ -88,6 +88,8 @@ microscope = MicroscopeController(verbose=True)
 del microscope
 ```
 
+The Python runtime will automatically call the `__del__` functions on each of the controller classes when a program terminates, so you shouldn't have to worry about cleanup unless you plan on instantiating and freeing the `MicroscopeController` class multiple times within a single run of a program.
+
 If you are on a Unix system, you'll probably need to manually specify the port and baudrate for each device.
 
 ```Python
