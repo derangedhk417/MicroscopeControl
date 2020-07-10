@@ -6,6 +6,8 @@ This repository contains the code necessary to control all of the components of 
 
 In order to run this code, you need openCV, NumPy, SciPy, Matplotlib, pixelinkWrapper, kivy and pyserial installed. You should be able to accomplish this with the following.
 
+You will need to run the installer in `dependencies/` in order to install the build tools for windows, before you run the user interface programs in this repo and before you install kivy (second command below). Everything should run on Linux without issue.
+
 ```
 pip install numpy scipy opencv-python matplotlib pixelinkWrapper pyserial --user
 python -m pip install https://github.com/kivy/kivy/archive/master.zip
