@@ -113,7 +113,10 @@ class StageController:
 			wait_thread.start()
 
 	def moveDelta(self, x, y, callback=None):
-		command_string = b"R X=%d Y=%d Z \r"%(x * 10000, y * 10000)
+		command_string = b"R X=%d Y=%d Z \r"%(
+			int(round(x * 10000)), 
+			int(round(y * 10000))
+		)
 
 		self.connection.write(command_string)
 
