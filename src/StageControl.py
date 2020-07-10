@@ -11,6 +11,10 @@ import code
 
 # This handles the motion of the motorized stage as well as reading
 # data from the stage (in order to determine stage position).
+# Long running operations have an optional parameter called "callback".
+# When specified, these operations will return immediately and will call
+# this callback function when complete. Operations that return a value
+# will pass that value to the callback function instead, when specified.
 class StageController:
 	def __init__(self, port="COM3", baud=9600, timeout=0.01):
 		self.connection = serial.Serial(port, baud, timeout=timeout)

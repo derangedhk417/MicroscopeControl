@@ -6,12 +6,17 @@
 
 import serial
 import sys
-import code
 import time
+import threading
+import code
 
 # This handles focusing and zooming of the microscope.
-# TODO: Add a mode to this class that has non-blocking queued commands and
-# callback functions for handling errors.
+# All calls that perform a long running operation have a keyword
+# argument called "callback". When specified, the function will 
+# return automatically, and will call the specified callback function
+# when the operation is complete. For functions that normally return 
+# a value, this callback function should take that value as its first
+# argument.
 class FocusController:
 	# The timeout argument controls how long the serial connection
 	# will wait for data when reading. If this value is too high, function
@@ -298,7 +303,7 @@ class FocusController:
 		return (focus - self.focus_range[0]) / (self.focus_range[1] - self.focus_range[0])
 
 	# Change the current zoom by the specified value.
-	def incrementZoom(self, value):
+	def incrementZoom(self, value, callback=None):
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
 
@@ -322,11 +327,22 @@ class FocusController:
 		response = self.readResponse()
 		value    = self._parse_response(response, command_str)
 
-		self._wait_for_idle('zoom')
-		return int(value[1])
+
+		if callback is None:
+			self._wait_for_idle('zoom')
+			return int(value[1])
+		else:
+			def complete_operation():
+				self._wait_for_idle('zoom')
+				callback(int(value[1]))
+			wait_thread = threading.Thread(target=complete_operation)
+			wait_thread.start()
+			return None
+		
+		
 
 	# Change the current focus by the specified value.
-	def incrementFocus(self, value):
+	def incrementFocus(self, value, callback=None):
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
 
@@ -351,25 +367,48 @@ class FocusController:
 		response = self.readResponse()
 		value    = self._parse_response(response, command_str)
 
-		self._wait_for_idle('focus')
-		return int(value[1])
+		if callback is None:
+			self._wait_for_idle('focus')
+			return int(value[1])
+		else:
+			def complete_operation():
+				self._wait_for_idle('focus')
+				callback(int(value[1]))
+			wait_thread = threading.Thread(target=complete_operation)
+			wait_thread.start()
+			return None
 
 	# Set the position of the zoom motor. By default, this will home the
 	# zoom motor to position zero before moving to the requested position. 
 	# This results in better repeatability.
-	def setZoom(self, value, corrected=True):
+	def setZoom(self, value, corrected=True, callback=None):
 		if value < 0.0 or value > 1.0:
 			raise Exception("Values must be in the range [0.0, 1.0]")
 
 		if corrected:
 			self._set_zoom(0.0)
-			self._wait_for_idle('zoom')
-			self._set_zoom(value)
-			
+			if callback is None:
+				self._wait_for_idle('zoom')
+				self._set_zoom(value)
+				self._wait_for_idle('zoom')
+			else:
+				def complete_operation():
+					self._wait_for_idle('zoom')
+					self._set_zoom(value)
+					self._wait_for_idle('zoom')
+					callback()
+				wait_thread = threading.Thread(target=complete_operation)
+				wait_thread.start()
 		else:
 			self._set_zoom(value)
-
-		self._wait_for_idle('zoom')
+			if callback is None:
+				self._wait_for_idle('zoom')
+			else:
+				def complete_operation():
+					self._wait_for_idle('zoom')
+					callback()
+				wait_thread = threading.Thread(target=complete_operation)
+				wait_thread.start()
 
 	def _set_zoom(self, value):
 		value  = value * (self.zoom_range[1] - self.zoom_range[0])
@@ -389,18 +428,34 @@ class FocusController:
 	# Set the position of the focus motor. By default, this will home the
 	# focus motor to position zero before moving to the requested position. 
 	# This results in better repeatability.
-	def setFocus(self, value, corrected=True):
+	def setFocus(self, value, corrected=True, callback=None):
 		if value < 0.0 or value > 1.0:
 			raise Exception("Values must be in the range [0.0, 1.0]")
 
 		if corrected:
 			self._set_focus(0.0)
-			self._wait_for_idle('focus')
-			self._set_focus(value)
+			if callback is None:
+				self._wait_for_idle('focus')
+				self._set_focus(value)
+				self._wait_for_idle('focus')
+			else:
+				def complete_operation():
+					self._wait_for_idle('focus')
+					self._set_focus(value)
+					self._wait_for_idle('focus')
+					callback()
+				wait_thread = threading.Thread(target=complete_operation)
+				wait_thread.start()
 		else:
 			self._set_focus(value)
-
-		self._wait_for_idle('focus')
+			if callback is None:
+				self._wait_for_idle('focus')
+			else:
+				def complete_operation():
+					self._wait_for_idle('focus')
+					callback()
+				wait_thread = threading.Thread(target=complete_operation)
+				wait_thread.start()
 
 	def _set_focus(self, value):
 		value  = value * (self.focus_range[1] - self.focus_range[0]) 
