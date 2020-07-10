@@ -4,10 +4,11 @@ This repository contains the code necessary to control all of the components of 
 
 ## Dependencies
 
-In order to run this code, you need openCV, NumPy, SciPy, Matplotlib, pixelinkWrapper and pyserial installed. You should be able to accomplish this with the following.
+In order to run this code, you need openCV, NumPy, SciPy, Matplotlib, pixelinkWrapper, kivy and pyserial installed. You should be able to accomplish this with the following.
 
 ```
 pip install numpy scipy opencv-python matplotlib pixelinkWrapper pyserial --user
+python -m pip install https://github.com/kivy/kivy/archive/master.zip
 ```
 
 In addition to the Python libraries required, you will also need to install the Pixelink capture software. This comes with the drivers and .dll files necessary for the Python wrapper to interface with the camera. The software can be found [here](https://pixelink.com/products/software/pixelink-capture-software/pixelink-capture-software-download/). The repository that contains sample code necessary to use the Python wrapper can be found [here](https://github.com/pixelink-support/pixelinkPythonWrapper). Detailed documentation of the protocols necessary to communicate with the stage and the focus and zoom motors can be found in the `documentation/` folder of this repository. An introduction to the Pixelink API is available [here](https://support.pixelink.com/support/solutions/articles/3000044964-basic-principles).
