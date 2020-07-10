@@ -69,6 +69,16 @@ microscope.camera.disableAutoExposure()
 
 # Turn off capture mode.
 microscope.camera.endCapture()
+
+# Move the stage, but return immediately and call a callback function when
+# the stage finishes moving.
+
+# This function will be called when the stage stops moving.
+def done():
+    print("Done moving")
+    # Do Something?
+   
+microscope.stage.moveTo(30, 30, callback=done)
 ```
 
 The `CameraController` class will automatically ensure that everything disconnects properly when it is freed. You can do this manually with
