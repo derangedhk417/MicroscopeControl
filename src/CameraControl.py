@@ -1,3 +1,9 @@
+# Author:      Adam Robinson
+# Description: This file contains a class that allows a user to programmatically
+#              turn the auto-exposure feature of the Pixelink camera on and off.
+#              It also contains a function for retrieving a frame from the camera
+#              as a NumPy ndarray. 
+
 from pixelinkWrapper import *
 from ctypes          import *
 

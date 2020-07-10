@@ -1,3 +1,9 @@
+# Author:      Adam Robinson
+# Description: This class handles zooming and focusing of the microscope
+#              via the connected servo-motors. This file also contains a
+#              helper function that attempts to detect and automatically 
+#              connect to the motor controller.
+
 import serial
 import sys
 import code
@@ -20,17 +26,30 @@ class FocusController:
 
 		# Motor 1 is zoom.
 		# Motor 2 is focus.
-
 		# Read the motor limits from the controller so that this class
 		# can limit itself. This should prevent the motors from attempting
 		# to go past their limits.
-		z, f = self._read_limits()
+		try:
+			z, f = self._read_limits()
 
-		self.zoom_range  = (0, z)
-		self.focus_range = (0, f)
+			self.zoom_range  = (0, z)
+			self.focus_range = (0, f)
 
-		self._wait_for_idle('zoom')
-		self._wait_for_idle('focus')
+			self._wait_for_idle('zoom')
+			self._wait_for_idle('focus')
+		except Exception as ex:
+			self.cleanup()
+			raise Exception("Error reading motor limits.") from ex
+
+	def __del__(self):
+		self.cleanup()
+
+	def cleanup(self):
+		try:
+			if self.connection.is_open:
+				self.connection.close()
+		except:
+			pass
 
 	# "motor" should be either "zoom" or "focus". This function
 	# will return true if the motor is idle and false otherwise.
@@ -412,11 +431,33 @@ class FocusController:
 
 		return responses
 
+# This class will attempt to connect to the motor controller, assuming
+# that it is plugged in. It does this by querying every serial controller
+# it can find and attempting to issue an innocuous command to it. If the
+# controller responds appropriately, it is assumed to be the motor controller.
+# This function will return a connected and ready to go FocusController object
+# if it succeeds and None otherwise.
+def autoConnect():
+	# Build a list of ports to try.
+	ports = ["COM4", "COM1", "COM2", "COM3", "COM0"]
 
+	for i in range(5, 10):
+		ports.append("COM%d"%i)
+
+	for p in ports:
+		try:
+			# This class always reads it's limits from the controller upon
+			# initialization, so it will throw an exception if we have 
+			# connected to something that isn't the controller.
+			controller = FocusController(p, 38400)
+			return controller
+		except:
+			continue
+
+	return None
 
 if __name__ == '__main__':
 	port       = sys.argv[1]
 	baud       = int(sys.argv[2])
 	controller = FocusController(port, baud)
-	#serial = serial.Serial(port, baud, timeout=0.5)
 	code.interact(local=locals())

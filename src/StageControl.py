@@ -1,7 +1,11 @@
+# Authors:     Adam Robinson, Cicely Motamedi
+# Description: This class controls motion of the XY stage. It also contains
+#              a helper function for automatically recognizing and connecting
+#              to the stage.
+
 import serial
 import sys
 import code
-
 
 # This handles the motion of the motorized stage as well as reading
 # data from the stage (in order to determine stage position).
@@ -15,7 +19,21 @@ class StageController:
 
 		# This will prevent the system from hitting the supports that hold
 		# the optics.
-		controller.setLimits([-50, 50], [-50, 37])
+		try:
+			self.setLimits([-50, 50], [-50, 37])
+		except Exception as ex:
+			self.cleanup()
+			raise Exception("Error setting stage limits.") from ex
+
+	def __del__(self):
+		self.cleanup()
+
+	def cleanup(self):
+		try:
+			if self.connection.is_open:
+				self.connection.close()
+		except:
+			pass
 
 	def readResponse(self):
 		response_string = ""
@@ -176,7 +194,30 @@ class StageController:
 		else:
 			raise IOError("Malformed response from controller. (%s)"%response)
 
+# This class will attempt to connect to the stage controller, assuming
+# that it is plugged in. It does this by querying every serial controller
+# it can find and attempting to issue an innocuous command to it. If the
+# controller responds appropriately, it is assumed to be the stage controller.
+# This function will return a connected and ready to go StageController object
+# if it succeeds and None otherwise.
+def autoConnect():
+	# Build a list of ports to try.
+	ports = ["COM3", "COM1", "COM2", "COM4", "COM0"]
 
+	for i in range(5, 10):
+		ports.append("COM%d"%i)
+
+	for p in ports:
+		try:
+			# This class always set motion limits on the stage upon
+			# initialization, so it will throw an exception if we have 
+			# connected to something that isn't the controller.
+			controller = StageController(p, 9600)
+			return controller
+		except:
+			continue
+
+	return None
 
 if __name__ == '__main__':
 	port       = sys.argv[1]
