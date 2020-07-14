@@ -16,7 +16,7 @@ import code
 # this callback function when complete. Operations that return a value
 # will pass that value to the callback function instead, when specified.
 class StageController:
-	def __init__(self, port="COM3", baud=9600, timeout=0.01):
+	def __init__(self, port="COM3", baud=9600, timeout=0):
 		self.connection = serial.Serial(port, baud, timeout=timeout)
 		self.position   = None
 
@@ -41,14 +41,22 @@ class StageController:
 		except:
 			pass
 
-	def readResponse(self):
+	def readResponse(self, timeout=2):
+		start           = time.time_ns()
 		response_string = ""
 		char            = self.connection.read(1).decode("ascii")
 		while char != '\r':
 			response_string += char
 			char             = self.connection.read(1).decode("ascii")
+			if (time.time_ns() - start) / 1e9 > timeout:
+				raise IOError("Controller took too long to respond.")
 
 		char = self.connection.read(1).decode("ascii")
+
+		while char == '':
+			char = self.connection.read(1).decode("ascii")
+			if (time.time_ns() - start) / 1e9 > timeout:
+				raise IOError("Controller took too long to respond.")
 
 		if char != '\n':
 			raise IOError("Incomplete response from controller.")

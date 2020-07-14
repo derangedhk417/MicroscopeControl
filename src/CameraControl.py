@@ -101,9 +101,6 @@ class CameraController:
 	def cleanup(self):
 		ret = PxLApi.uninitialize(self.camera_handle)
 
-		if not PxLApi.apiSuccess(ret[0]):
-			raise Exception("Failed to disconnect from camera.")
-
 
 	# Returns a frame. By default, this will be in the BGR pixel format.
 	# Set convert=True to get an RGB frame.

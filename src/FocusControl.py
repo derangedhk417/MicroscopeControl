@@ -22,12 +22,22 @@ class FocusController:
 	# will wait for data when reading. If this value is too high, function
 	# calls will take a long time to return because the class will spend so
 	# much time waiting for more data on the serial port.
-	def __init__(self, port="COM4", baud=38400, timeout=0.01):
+	#
+	# retries: The number of times to retry an operation if it fails. 
+	#          Unfortunately, the controller seems to fail randomly,
+	#          which makes this kind of thing necessary.
+	def __init__(self, port="COM4", baud=38400, timeout=0, retries=4):
 		self.connection = serial.Serial(port, baud, timeout=timeout)
-		self.position   = None
+		self.retries    = retries
 
 		if not self.connection.is_open:
 			raise Exception("Failed to open serial connection.")
+
+		# If an operation appears to cause an invalid response from the
+		# controller, but does not result in invalid behavior, this can
+		# be set in order to prevent exceptions from being generated. Use
+		# at your own risk.
+		self._ignore_response = False
 
 		# Motor 1 is zoom.
 		# Motor 2 is focus.
@@ -45,6 +55,8 @@ class FocusController:
 		except Exception as ex:
 			self.cleanup()
 			raise Exception("Error reading motor limits.") from ex
+
+		
 
 	def __del__(self):
 		self.cleanup()
@@ -117,23 +129,34 @@ class FocusController:
 
 		return zoom_limit, focus_limit
 
+	def _set_ignore_response(self, value):
+		self._ignore_response = value
+
 	# Returns zoom_limit, focus_limit
 	def getLimits(self):
 		return self._read_limits()
 
 	# Read data from the serial port until a complete response has been
 	# sent. The response is terminated with "$ ", so this function returns
-	# when it reads that. It does NOT retur the final "$ ".
-	def readResponse(self):
+	# when it reads that. It does NOT return the final "$ ".
+	def readResponse(self, timeout=2):
+		start           = time.time_ns()
 		response_string = ""
 		char            = self.connection.read(1).decode("ascii")
 		while char != '$':
 			response_string += char
 			char             = self.connection.read(1).decode("ascii")
+			if (time.time_ns() - start) / 1e9 > timeout:
+				raise IOError("Controller took too long to respond.")
 
 		char = self.connection.read(1).decode("ascii")
 
-		if char != ' ':
+		while char == '':
+			char = self.connection.read(1).decode("ascii")
+			if (time.time_ns() - start) / 1e9 > timeout:
+				raise IOError("Controller took too long to respond.")
+
+		if char != ' ' and not self._ignore_response:
 			raise IOError("Incomplete response from controller. (%s)")
 
 		return response_string
@@ -478,11 +501,12 @@ class FocusController:
 	def _parse_response(self, response, command):
 		responses = response.split("\r\n")
 
-		if responses[0].strip() != command.decode('ascii').strip():
-			raise IOError("Controller received corrupted command. (%s != %s)"%(
-				command.decode("ascii").strip(), 
-				responses[0].strip()
-			))
+		if not self._ignore_response:
+			if responses[0].strip() != command.decode('ascii').strip():
+				raise IOError("Controller received corrupted command. (%s != %s)"%(
+					command.decode("ascii").strip(), 
+					responses[0].strip()
+				))
 
 		return responses
 
@@ -504,7 +528,7 @@ def autoConnect():
 			# This class always reads it's limits from the controller upon
 			# initialization, so it will throw an exception if we have 
 			# connected to something that isn't the controller.
-			controller = FocusController(p, 38400)
+			controller = FocusController(p, 115200)
 			return controller
 		except:
 			continue
