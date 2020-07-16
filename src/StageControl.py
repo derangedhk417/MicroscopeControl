@@ -18,10 +18,16 @@ import code
 class StageController:
 	def __init__(self, port="COM3", baud=9600, timeout=0):
 		self.connection = serial.Serial(port, baud, timeout=timeout)
-		self.position   = None
 
 		if not self.connection.is_open:
 			raise Exception("Failed to open serial connection.")
+
+		# Read the response buffer and get rid of it. It may be filled
+		# with an error response from the system attempting to connect to
+		# the focus controller and sending commands to it.
+		self.connection.write(b"\r")
+		self.readResponse()
+
 
 		# This will prevent the system from hitting the supports that hold
 		# the optics.
@@ -188,13 +194,13 @@ class StageController:
 		x = [int(round(x[0])), int(round(x[1]))]
 		y = [int(round(y[0])), int(round(y[1]))]
 
-		command_string = b"SL X=%d Y=%d \r"%(x[0], y[0])
+		command_string = b"SETLOW X=%d Y=%d \r"%(x[0], y[0])
 
 		self.connection.write(command_string)
 		response      = self.readResponse()
 		response_data = self._parse_response(response)
 
-		command_string = b"SU X=%d Y=%d \r"%(x[1], y[1])
+		command_string = b"SETUP X=%d Y=%d \r"%(x[1], y[1])
 
 		self.connection.write(command_string)
 		response      = self.readResponse()
@@ -264,7 +270,7 @@ class StageController:
 # if it succeeds and None otherwise.
 def autoConnect():
 	# Build a list of ports to try.
-	ports = ["COM3", "COM1", "COM2", "COM4", "COM0"]
+	ports = ["COM4", "COM1", "COM2", "COM3", "COM0"]
 
 	for i in range(5, 10):
 		ports.append("COM%d"%i)
@@ -276,8 +282,8 @@ def autoConnect():
 			# connected to something that isn't the controller.
 			controller = StageController(p, 9600)
 			return controller
-		except:
-			continue
+		except Exception as ex:
+			raise ex
 
 	return None
 

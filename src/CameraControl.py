@@ -104,7 +104,7 @@ class CameraController:
 
 	# Returns a frame. By default, this will be in the BGR pixel format.
 	# Set convert=True to get an RGB frame.
-	def getFrame(self, convert=False):
+	def getFrame(self, convert=False, downscale=None):
 		ret = PxLApi.getNextFrame(
 			self.camera_handle, 
 			self.raw_image_buffer
@@ -140,6 +140,9 @@ class CameraController:
 
 		if convert:
 			np_img = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
+
+		if downscale is not None:
+			np_img = cv2.resize(np_img, (0, 0), fx=(1 / downscale), fy=(1 / downscale))
 
 		return np_img
 
