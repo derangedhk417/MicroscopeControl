@@ -426,8 +426,10 @@ class MicroscopeController:
 
 		self.camera.startCapture()
 		self.camera.enableAutoExposure()
-		time.sleep(1)
-		#self.camera.disableAutoExposure()
+		print("Adjusting exposure")
+		time.sleep(2)
+		print("Done")
+		self.camera.disableAutoExposure()
 
 	
 		current_range = _range
@@ -459,7 +461,7 @@ class MicroscopeController:
 				self.focus.setFocus(position, corrected=False)
 				# img = self.camera.getFrame(downscale=3)
 				# img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-				img = avgimg(1)
+				img = avgimg(3)
 				cv2.imshow("Focus Preview", img)
 				cv2.waitKey(1)
 				images.append(img)

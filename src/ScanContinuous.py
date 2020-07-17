@@ -9,9 +9,7 @@ import cv2
 import json
 import math
 
-from MicroscopeControl  import MicroscopeController
-from scipy.optimize     import curve_fit
-from matplotlib.patches import Rectangle
+from MicroscopeControl import MicroscopeController
 
 # Process the command line arguments supplied to the program.
 def preprocess():
@@ -61,6 +59,16 @@ def preprocess():
 		'-n', '--n-focus', dest='n_focus', type=int, required=True,
 		help='The number of random positions in each square to focus on when calibrating.' 
 	)	
+
+	parser.add_argument(
+		'-fps', '--frames-per-second', dest='fps', type=int, default=32,
+		help='Assume the camera captures this many frames per second when setting stage velocity.' 
+	)
+
+	parser.add_argument(
+		'-pi', '--preview-interval', dest='preview_interval', type=int, default=4,
+		help='Show a preview image at integer multiples of this number.' 
+	)
 
 
 	args = parser.parse_args()
@@ -123,20 +131,21 @@ if __name__ == '__main__':
 	microscope.focus.setZoom(0.99)
 	microscope.stage.moveTo(x_current, y_current)
 
-	# print("Focusing microscope.")
-	# microscope.autoFocus(args.focus_range)
+	# Based on the assumption that the camera is getting frame_rate
+	# frames per second, and an image is args.image_height by 
+	# args.image_width, we need to determine an appropriate scan
+	# speed on each axis. This will inevitably result in some overlap
+	# between images, but that is better than missing data.
 
-	# print("Focusing complete. Please check the following image.")
-	# time.sleep(1.2)
+	# The default value for fps is slightly lower than the actual one,
+	# to ensure that we don't miss any part of the slide.
+	x_velocity = min(args.image_width  * args.fps, 7.45)
+	y_velocity = min(args.image_height * args.fps, 7.45)
 
-	# microscope.camera.startCapture()
-	# img = microscope.camera.getFrame(convert=True)
-	# plt.imshow(img)
-	# plt.show()
-	# microscope.camera.endCapture()
-
-	# if input("Proceed (y/n)? ").lower() != 'y':
-	# 	exit()
+	print("Setting velocity to vx, vy = %1.3f mm/s, %1.3f mm/s"%(
+		x_velocity, y_velocity
+	))
+	microscope.stage.setMaxSpeed(x_velocity, y_velocity)
 
 	print("Beginning scan.")
 	start = time.time_ns()
@@ -150,7 +159,6 @@ if __name__ == '__main__':
 	# First, we'll create an array of locations corresponding to the
 	# top-left of each square we are going to scan.
 	locations = []
-	extents   = []
 	x   = args.x_limits[0]
 	xl  = args.x_limits[1] - args.x_limits[0]
 	y   = args.y_limits[0]
@@ -160,79 +168,43 @@ if __name__ == '__main__':
 
 	for i in range(n_x):
 		for j in range(n_y):
-			loc = [
+			locations.append([
 				x + args.square_size*i,
 				y + args.square_size*j
-			]
-			locations.append(loc)
-			extent = [
-				min(loc[0] + args.square_size, args.x_limits[1]),
-				min(loc[1] + args.square_size, args.y_limits[1]),
-			]
-			extents.append(extent)
+			])
 
+	print("Sample will be broken down into %d square regions."%len(locations))
 
-	locations = np.array(locations)
-	extents   = np.array(extents)
-	
-	plt.scatter(locations[:, 0], locations[:, 1], s=1)
-	plt.scatter(extents[:, 0],   extents[:, 1],   s=1)
-	plt.show()
-
-	
 	n_squares = 0
 	n_images  = 0
-
-	microscope.stage.setMaxSpeed(7.5, 7.5)
 
 	scanned_locations = []
 
 	# Iterate over the locations.
-	for (x, y), (xh, yh) in zip(locations, extents):
+	for x, y in locations:
+		print("Square %d / %d"%(n_squares + 1, len(locations)))
 		# First we calibrate by focusing at several random
 		# points in the square.
 		xlow  = x
-		xhigh = xh
+		xhigh = x + args.square_size
 		x_r   = np.random.uniform(xlow, xhigh, args.n_focus)
 
 		ylow  = y
-		yhigh = yh
+		yhigh = y + args.square_size
 		y_r   = np.random.uniform(ylow, yhigh, args.n_focus)
 
-		points = np.array([
-			[xlow, ylow],
-			[xlow, yhigh],
-			[xhigh, ylow],
-			[xhigh, yhigh]
-		])
-
-		print("Performing focus calibration for square %d"%n_squares)
+		print("Performing focus calibration for square")
 		focal_points = []
-		for xp, yp in points:
-			print("Position: %f %f"%(xp, yp))
-			microscope.stage.moveTo(xp, yp)
+		for xr, yr in zip(x_r, y_r):
+			print("Position: %f %f"%(xr, yr))
+			microscope.stage.moveTo(xr, yr)
 			microscope.autoFocus(args.focus_range)
 			focal_points.append(microscope.focus.getFocus())
 
-		focal_points = np.array(focal_points)
-
-		def fit(X, mx, my, b):
-			x, y = X
-			return mx*x + my*y + b
-
-		res, cov = curve_fit(fit, points.T, focal_points)
-
-		def interp(X):
-			return res[0]*X[0] + res[1]*X[1] + res[2]
-
-		rmse = np.sqrt(np.square(interp(points.T) - focal_points).mean())
-		print("Focus function RMSE: %f"%rmse)
-
-
-		# print(focal_points)
-		# focus = np.array(focal_points).mean()
-		# print("Selecting focus: %f"%focus)
-		microscope.focus.setFocus(focal_points[0])
+		print(focal_points)
+		focus = np.array(focal_points).mean()
+		print("Selecting focus: %f"%focus)
+		microscope.focus.setFocus(focus)
 
 		# Now we image the square.
 		x_current = x
@@ -240,10 +212,14 @@ if __name__ == '__main__':
 		microscope.stage.moveTo(x_current, y_current)
 
 		while x_current < xhigh:
-			while y_current < yhigh:
+			microscope.stage.moveTo(x_current, yhigh, return_immediately=True)
+
+			n_captured = 0
+			while True:
 				# Take an image
 				xc, yc = microscope.stage.getPosition()
-				img  = microscope.camera.getFrame(convert=False)
+				img    = microscope.camera.getFrame(convert=False)
+				n_captured += 1
 
 				scanned_locations.append([xc, yc])
 
@@ -254,19 +230,20 @@ if __name__ == '__main__':
 				n_images += 1
 				fname = os.path.join(args.output_directory, fstr)
 
-				decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-				cv2.imshow('Scan Preview', decimated)
-				cv2.waitKey(1)
+				if n_captured % args.preview_interval == 0:
+					decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
+					cv2.imshow('Scan Preview', decimated)
+					cv2.waitKey(1)
 
 				cv2.imwrite(fname, img)
-				y_current += args.image_height
-				microscope.stage.moveTo(x_current, y_current)
-				microscope.focus.setFocus(interp((x_current, y_current)), corrected=False)
 
-			y_current = y
+				if microscope.stage.getAxisStatus('x') or microscope.stage.getAxisStatus('y'):
+					continue
+				else:
+					break
+
 			x_current += args.image_width
 			microscope.stage.moveTo(x_current, y_current)
-			microscope.focus.setFocus(interp((x_current, y_current)), corrected=False)
 
 		n_squares += 1
 
@@ -279,60 +256,6 @@ if __name__ == '__main__':
 
 	duration = ((end - start) / 1e9) / 60
 	print("Scan took %d minutes"%(int(duration)))
-
-	# while y_current < args.y_limits[1]:
-	# 	x_current = args.x_limits[0]
-	# 	microscope.stage.moveTo(x_current, y_current)
-	# 	if y_current != args.y_limits[0]:
-	# 		res = False
-	# 		increment = args.image_height
-	# 		original_focus = microscope.focus.getFocus()
-	# 		tries     = 0
-	# 		while not res and tries < 4:
-	# 			res = microscope.autoFocus(args.focus_range)
-
-	# 			if not res:
-	# 				microscope.stage.moveTo(x_current, y_current + increment)
-	# 				increment *= 2
-	# 				tries     += 1
-
-	# 		if tries == 4:
-	# 			microscope.focus.setFocus(original_focus)
-
-	# 	while x_current < args.x_limits[1]:
-	# 		if n_images % args.focus_interval == 0:
-	# 			res = False
-	# 			increment = args.image_width
-	# 			original_focus = microscope.focus.getFocus()
-	# 			tries     = 0
-	# 			while not res and tries < 4:
-	# 				res = microscope.autoFocus(args.focus_range)
-
-	# 				if not res:
-	# 					microscope.stage.moveTo(x_current + increment, y_current)
-	# 					increment *= 2
-	# 					tries     += 1
-	# 			if tries == 4:
-	# 				microscope.focus.setFocus(original_focus)
-	# 		x, y = microscope.stage.getPosition()
-	# 		img  = microscope.camera.getFrame(convert=False)
-
-	# 		fstr  = '%06d_%2.5f_%2.5f.png'%(
-	# 			n_images, x, y
-	# 		)
-	# 		fname = os.path.join(args.output_directory, fstr)
-
-	# 		decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-	# 		cv2.imshow('Scan Preview', decimated)
-	# 		cv2.waitKey(1)
-
-	# 		cv2.imwrite(fname, img)
-
-	# 		n_images  += 1
-	# 		x_current += args.image_width
-	# 		microscope.stage.moveTo(x_current, y_current)
-
-	# 	y_current += args.image_height
 
 	microscope.camera.endCapture()
 

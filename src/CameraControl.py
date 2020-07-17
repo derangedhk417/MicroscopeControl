@@ -102,6 +102,38 @@ class CameraController:
 		ret = PxLApi.uninitialize(self.camera_handle)
 
 
+	def _api_range_error(rc):
+		a = rc == PxLApi.ReturnCode.ApiInvalidParameterError
+		b = rc == PxLApi.ReturnCode.ApiOutOfRangeError
+    	return a or b
+
+	def getExposure(self):
+		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.EXPOSURE)
+
+		if not PxLApi.apiSuccess(ret[0]):
+			raise Exception("Failed to read exposure.")
+
+		return ret[2][0]
+
+	def setExposure(self, exposure):
+		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.EXPOSURE)
+
+		if not PxLApi.apiSuccess(ret[0]):
+			raise Exception("Failed to read exposure.")
+
+		params    = ret[2]
+		params[0] = exposure
+
+		ret = PxLApi.setFeature(
+			self.camera_handle, 
+			PxLApi.FeatureId.EXPOSURE, 
+			PxLApi.FeatureFlags.MANUAL, 
+			params
+		)
+
+		if not PxLApi.apiSuccess(ret[0]) or self._api_range_error(ret[0]):
+			raise Exception("Failed to set exposure.")
+
 	# Returns a frame. By default, this will be in the BGR pixel format.
 	# Set convert=True to get an RGB frame.
 	def getFrame(self, convert=False, downscale=None):

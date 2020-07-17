@@ -91,7 +91,7 @@ class StageController:
 	# It will user the serial connection to check the axis status every
 	# "interval" seconds and will throw an exception after "timeout" seconds,
 	# if both axes have not reached the idle state.
-	def _wait_for_idle(self, interval=0.05, timeout=30):
+	def _wait_for_idle(self, interval=0.15, timeout=30):
 		start = time.time_ns()
 
 		while True:
@@ -106,7 +106,7 @@ class StageController:
 				raise Exception(msg%timeout)
 
 	# Move the stage position to the given value in millimeters.
-	def moveTo(self, x, y, callback=None):
+	def moveTo(self, x, y, callback=None, return_immediately=False):
 		x = int(round(x * 10000))
 		y = int(round(y * 10000))
 
@@ -117,6 +117,8 @@ class StageController:
 		response      = self.readResponse()
 		response_data = self._parse_response(response)
 
+		if return_immediately:
+			return
 		if callback is None:
 			self._wait_for_idle()
 		else:
