@@ -10,6 +10,7 @@ from StageControl   import StageController
 from FocusControl   import autoConnect     as getFocusController
 from StageControl   import autoConnect     as getStageController
 from scipy.optimize import curve_fit
+from Progress       import ProgressBar
 
 import time
 import code
@@ -78,371 +79,52 @@ class MicroscopeController:
 			if self.verbose:
 				print("DONE")
 
-	# def autoFocus(self, _range, n_divisions=100, passes=1, n_avg=1, display=True):
-	# 	# Save the current focus motor settings so that we can set them
-	# 	# when we are done.
-	# 	if n_divisions < 5:
-	# 		raise Exception("You must specify n_divisions >= 5.")
 
-	# 	focus_accel     = self.focus.getFocusAcceleration()
-	# 	focus_initial_v = self.focus.getFocusInitialVelocity()
-	# 	focus_final_v   = self.focus.getFocusMaxVelocity()
+	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=True):
+		if ndiv < 5:
+			raise Exception("You must specify ndiv >= 5.")
 
-	# 	# Set the initial and final velocities to be a very small
-	# 	# portion of the limit value, so that the motor will move
-	# 	# really slowly.
-	# 	z_max, f_max = self.focus.getLimits()
-
-	# 	# I'm guessing that this will cause it to take ten seconds to
-	# 	# Scan through the enstire focus range.
-	# 	self.focus.setFocusInitialVelocity(50)
-	# 	self.focus.setFocusMaxVelocity(500)
-
-	# 	# Seek to zero, then seek to the maximum and take an image 
-	# 	# every 50 milliseconds the entire way.
-
-	# 	self.camera.startCapture()
-	# 	self.camera.enableAutoExposure()
-	# 	time.sleep(1)
-	# 	self.camera.disableAutoExposure()
-
-	# 	current_range = _range
-	# 	for idx in range(passes):
-	# 		if self.verbose:
-	# 			print("Range: [%2.4f, %2.4f]"%(current_range[0], current_range[1]))
-
-	# 		steps = np.linspace(current_range[0], current_range[1], n_divisions)
-
-	# 		self.focus.setFocus(0.0)
-
-	# 		if self.verbose:
-	# 			print("Imaging focus range (pass %d)."%(idx + 1))
-
-	# 		images    = []
-	# 		positions = []
-	# 		for position in steps:
-	# 			time.sleep(0.05)
-	# 			self.focus.setFocus(position, corrected=False)
-
-	# 			current_images = []
-	# 			for i in range(n_avg):
-	# 				current_images.append(self.camera.getFrame(downscale=2))
-					
-
-	# 			_sum = current_images[0]
-	# 			if n_avg > 1:
-	# 				for img in current_images[1:]:
-	# 					_sum += img
-
-	# 			_sum = _sum / n_avg
-	# 			images.append(_sum)
-				
-	# 			current_focus = self.focus.getFocus()
-	# 			positions.append(current_focus)
-	# 			if self.verbose:
-	# 				print(".", end='', flush=True)
-
-			
-	# 		if self.verbose:
-	# 			print('')
-	# 			print("Calculating gradients.")
-	# 		grad = []
-	# 		dx_filter = 0.5 * np.array(
-	# 			[[ 0, 0, 0],
-	# 			 [-1, 0, 1],
-	# 			 [ 0, 0, 0]]
-	# 		)
-
-	# 		dy_filter = 0.5 * np.array(
-	# 			[[ 0,  1, 0],
-	# 			 [ 0,  0, 0],
-	# 			 [ 0, -1, 0]]
-	# 		)
-
-	# 		smooth_filter = (1 / 9) * np.array(
-	# 			[[ 1, 1, 1],
-	# 			 [ 1, 1, 1],
-	# 			 [ 1, 1, 1]]
-	# 		)
-
-	# 		for img in images:
-	# 			img      = cv2.filter2D(img, -1, smooth_filter)
-	# 			grad_img = cv2.filter2D(img, -1, dx_filter + dy_filter)
-				
-	# 			# Select all gradients 1 std above the mean.
-	# 			std  = grad_img.std()
-	# 			mean = grad_img.mean()
-	# 			idx  = (grad_img - mean) > (std)
-	# 			grad.append(grad_img[idx].mean())
-	# 			# grad.append(grad_img.mean())
-	# 			if self.verbose:
-	# 				print(".", end='', flush=True)
-
-	# 		# Calculate a moving average of the data in order to smooth it.
-	# 		window_size = 5
-	# 		grad = np.pad(grad, (window_size, window_size), mode='edge')
-	# 		new_grad = []
-	# 		for idx in range(len(grad) - 2*window_size):
-	# 			center = idx + window_size
-	# 			_range = grad[center - window_size:center + window_size]
-	# 			new_grad.append(_range.mean())
-
-	# 		grad      = np.array(new_grad)
-	# 		positions = np.array(positions)
-
-	# 		test_fn          = lambda x, m, a, mu, sigma, b: m*x + a*np.exp(-np.square((x - mu) / sigma)) + b
-	# 		initial          = [0.1, 0.1, grad.max() - grad.min(), positions[grad.argmax()], 0.02]
-	# 		res, cov         = curve_fit(test_fn, positions, grad)
-	# 		fn_linear        = lambda x: res[0]*x + res[4]
-	# 		fn_gauss         = lambda x: res[1]*np.exp(-np.square((x - res[2]) / res[3]))
-	# 		linear_corrected = grad - fn_linear(positions)
-	# 		gauss_data       = fn_gauss(positions)
-
-	# 		rmse = np.sqrt(np.square(linear_corrected - gauss_data).mean())
-
-	# 		# Throw out any serious outliers.
-	# 		grad     = np.array(grad)
-	# 		best_idx = np.argmax(gauss_data)
-
-	# 		print("rmse: %f"%rmse)
-	# 		if self.verbose:
-	# 			print('', flush=True)
-	# 			a, = plt.plot(positions, grad)
-	# 			b, = plt.plot(positions, linear_corrected)
-	# 			c, = plt.plot(positions, gauss_data)
-				
-	# 			plt.axvline(positions[best_idx])
-	# 			plt.legend([a, b, c], ["Data", "Linear Component Removed", "Gaussian Fit"])
-	# 			plt.show()
-	# 		# if rmse > 0.1:
-	# 		# 	return False
-
-	# 		if self.verbose:
-	# 			print('', flush=True)
-			
-
-	# 		if best_idx < 2:
-	# 			start_new  = positions[0]
-	# 		else:
-	# 			start_new  = positions[best_idx - 2]
-
-	# 		if best_idx > len(positions) - 3:
-	# 			stop_new   = positions[-1]
-	# 		else:
-	# 			stop_new   = positions[best_idx + 2]
-
-	# 		current_range = [start_new, stop_new]
-
-	# 	focus_position = positions[best_idx]
-
-	# 	self.focus.setFocus(focus_position) 
-
-	# 	self.camera.enableAutoExposure()
-
-	# 	self.focus.setFocusAcceleration(focus_accel)
-	# 	self.focus.setFocusInitialVelocity(focus_initial_v)
-	# 	self.focus.setFocusMaxVelocity(focus_final_v)
-
-	# 	return True
-
-	# def autoFocus(self, _range, n_divisions=50):
-	# 	# Save the current focus motor settings so that we can set them
-	# 	# when we are done.
-	# 	if n_divisions < 5:
-	# 		raise Exception("You must specify n_divisions >= 5.")
-
-	# 	focus_accel     = self.focus.getFocusAcceleration()
-	# 	focus_initial_v = self.focus.getFocusInitialVelocity()
-	# 	focus_final_v   = self.focus.getFocusMaxVelocity()
-
-	# 	# Set the initial and final velocities to be a very small
-	# 	# portion of the limit value, so that the motor will move
-	# 	# really slowly.
-	# 	z_max, f_max = self.focus.getLimits()
-
-	# 	# I'm guessing that this will cause it to take ten seconds to
-	# 	# Scan through the enstire focus range.
-	# 	self.focus.setFocusInitialVelocity(50)
-	# 	self.focus.setFocusMaxVelocity(500)
-
-	# 	# Seek to zero, then seek to the maximum and take an image 
-	# 	# every 50 milliseconds the entire way.
-
-	# 	self.camera.startCapture()
-	# 	self.camera.enableAutoExposure()
-	# 	time.sleep(1)
-	# 	self.camera.disableAutoExposure()
-
-	
-	# 	if self.verbose:
-	# 		print("Range: [%2.4f, %2.4f]"%(_range[0], _range[1]))
-
-	# 	steps = np.linspace(_range[0], _range[1], n_divisions)
-
-	# 	self.focus.setFocus(0.0)
-
-	# 	def avgimg(n):
-	# 		imgs = []
-	# 		for i in range(n):
-	# 			img = self.camera.getFrame(downscale=3)
-	# 			img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	# 			imgs.append(img)
-
-	# 		base = np.zeros(imgs[0].shape)
-	# 		for i in imgs:
-	# 			base += i
-
-	# 		return (base / n).astype(np.uint8)
-
-	# 	images    = []
-	# 	positions = []
-	# 	for position in steps:
-	# 		#time.sleep(0.05)
-	# 		self.focus.setFocus(position, corrected=False)
-	# 		# img = self.camera.getFrame(downscale=3)
-	# 		# img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	# 		img = avgimg(3)
-	# 		cv2.imshow("preview", img)
-	# 		cv2.waitKey(1)
-	# 		images.append(img)
-	# 		current_focus = self.focus.getFocus()
-	# 		positions.append(current_focus)
-
-	# 		if self.verbose:
-	# 			print(".", end='', flush=True)
-
-	# 	# Smooth the images with a moving average and calculate the temporal gradient
-
-	# 	smooth_filter = (1 / 9) * np.array(
-	# 		[[ 1, 1, 1],
-	# 		 [ 1, 1, 1],
-	# 		 [ 1, 1, 1]]
-	# 	)
-
-	# 	if self.verbose:
-	# 		print('')
-	# 		print("Denoising.")
-
-	# 	tmp_images   = []
-	# 	stds         = []
-	# 	max_laplace  = []
-	# 	mean_laplace = []
-	# 	for img in images:
-	# 		#img = cv2.filter2D(img, -1, smooth_filter)
-	# 		img = cv2.fastNlMeansDenoising(img, 20)
-	# 		lpl = cv2.Laplacian(img, -1, ksize=3)
-	# 		max_laplace.append(lpl.max())
-	# 		mean_laplace.append(lpl.mean())
-	# 		stds.append(img.std())
-	# 		cv2.imshow("preview", img)
-	# 		cv2.waitKey(1)
-	# 		tmp_images.append(img)
-	# 		if self.verbose:
-	# 			print(".", end='', flush=True)
-	# 	images = tmp_images
-
-
-		
-	# 	if self.verbose:
-	# 		print('')
-	# 		print("Calculating gradients.")
-
-	# 	grad           = []
-	# 	grad_upper     = []
-	# 	grad_positions = []
-	# 	for idx in range(len(images) - 1):
-	# 		pos0 = positions[idx]
-	# 		pos1 = positions[idx + 1]
-	# 		img0 = images[idx]
-	# 		img1 = images[idx + 1]
-
-
-	# 		_grad = np.abs(img1 - img0)
-	# 		std   = _grad.std()
-	# 		mean  = _grad.mean()
-	# 		upper = (_grad - mean) > (std/2)
-
-	# 		grad_upper.append(_grad[upper].mean())
-	# 		grad.append(mean)
-	# 		grad_positions.append((pos0 + pos1) / 2)
-	# 		if self.verbose:
-	# 			print(".", end='', flush=True)
-		
-
-	# 	grad     = np.array(grad)
-	# 	best_idx = np.argmax(max_laplace)
-
-	# 	if self.verbose:
-	# 		print('', flush=True)
-	# 		a, = plt.plot(grad_positions, grad)
-	# 		b, = plt.plot(grad_positions, grad_upper)
-	# 		c, = plt.plot(positions, stds)
-	# 		d, = plt.plot(positions, max_laplace)
-	# 		e, = plt.plot(positions, mean_laplace)
-			
-	# 		plt.axvline(positions[best_idx])
-	# 		plt.legend([a, b, c, d, e], ["Mean Temporal Gradient", "Above 1 STD Temporal Gradient", "STD", "Max Laplace", "Mean Laplace"])
-	# 		plt.show()
-		
-
-	# 	if self.verbose:
-	# 		print('', flush=True)
-		
-
-	# 	focus_position = positions[best_idx]
-
-	# 	self.focus.setFocus(focus_position) 
-
-	# 	self.camera.enableAutoExposure()
-
-	# 	self.focus.setFocusAcceleration(focus_accel)
-	# 	self.focus.setFocusInitialVelocity(focus_initial_v)
-	# 	self.focus.setFocusMaxVelocity(focus_final_v)
-
-	# 	return True
-
-	def autoFocus(self, _range, n_divisions=100, passes=1):
 		# Save the current focus motor settings so that we can set them
 		# when we are done.
-		if n_divisions < 5:
-			raise Exception("You must specify n_divisions >= 5.")
-
 		focus_accel     = self.focus.getFocusAcceleration()
 		focus_initial_v = self.focus.getFocusInitialVelocity()
 		focus_final_v   = self.focus.getFocusMaxVelocity()
 
+		# Save the auto exposure status so that it can be reset.
+		exposure_on = self.camera.auto_exposure_enabled
+		if exposure_on:
+			self.camera.disableAutoExposure()
+
 		# Set the initial and final velocities to be a very small
 		# portion of the limit value, so that the motor will move
 		# really slowly.
-		z_max, f_max = self.focus.getLimits()
-
-		# I'm guessing that this will cause it to take ten seconds to
-		# Scan through the enstire focus range.
 		self.focus.setFocusInitialVelocity(50)
 		self.focus.setFocusMaxVelocity(500)
 
-		# Seek to zero, then seek to the maximum and take an image 
-		# every 50 milliseconds the entire way.
-
 		self.camera.startCapture()
-		self.camera.enableAutoExposure()
-		print("Adjusting exposure")
-		time.sleep(2)
-		print("Done")
-		self.camera.disableAutoExposure()
 
-	
+		if autoExpose:
+			self.camera.enableAutoExposure()
+			print("Adjusting exposure")
+			time.sleep(2)
+			print("Done")
+			self.camera.disableAutoExposure()
+
 		current_range = _range
 		for p in range(passes):
 			if self.verbose:
 				print("Range: [%2.4f, %2.4f]"%(current_range[0], current_range[1]))
 
-			steps = np.linspace(current_range[0], current_range[1], n_divisions)
+			steps = np.linspace(current_range[0], current_range[1], ndiv)
 
 			self.focus.setFocus(0.0)
 
+			# This is used to compute the average of n images in order to 
+			# reduce noise.
 			def avgimg(n):
 				imgs = []
+				# TODO: Figure out how to capture the images as greyscale so that
+				# we won't have to convert them.
 				for i in range(n):
 					img = self.camera.getFrame(downscale=3)
 					img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -454,98 +136,66 @@ class MicroscopeController:
 
 				return (base / n).astype(np.uint8)
 
+			pb1 = ProgressBar("Scanning Focus Range", 30, len(steps), 1, ea=2)
+			idx = 0
+
 			images    = []
 			positions = []
 			for position in steps:
-				#time.sleep(0.05)
 				self.focus.setFocus(position, corrected=False)
-				# img = self.camera.getFrame(downscale=3)
-				# img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-				img = avgimg(3)
-				cv2.imshow("Focus Preview", img)
-				cv2.waitKey(1)
+				img = avgimg(navg)
 				images.append(img)
+
+				# These motors are imperfect, so we can't trust the focus to
+				# be exactly what we set it to. We need to read it.
 				current_focus = self.focus.getFocus()
 				positions.append(current_focus)
 
-				if self.verbose:
-					print(".", end='', flush=True)
+				idx += 1
+				pb1.update(idx)
 
-			# Smooth the images with a moving average and calculate the temporal gradient
+			pb1.finish()
 
-			if self.verbose:
-				print('')
-				print("Denoising and calculating metrics.")
+			pb2 = ProgressBar("Denoising and Processing", 30, len(images), 1, ea=2)
+			idx = 0
 
-			tmp_images   = []
-			stds         = []
 			max_laplace  = []
-			mean_laplace = []
 			for img in images:
+				# Convert the images to floating point format so that we can
+				# get the best possible precision on the Laplacians.
+				img = img.astype(np.float32)
 				img = cv2.fastNlMeansDenoising(img, 20)
 				lpl = cv2.Laplacian(img, -1, ksize=3)
-
-				std  = lpl.std()
-				mean = lpl.mean()
-				high = np.abs(lpl - mean) > 2*std
-				#max_laplace.append(lpl[high].mean())
 				max_laplace.append(lpl.max())
-				mean_laplace.append(lpl.mean())
-				cv2.imshow("Lacplacian", lpl)
-				cv2.imshow("Focus Preview", img)
-				cv2.waitKey(1)
-				tmp_images.append(img)
-				if self.verbose:
-					print(".", end='', flush=True)
-			images = tmp_images
+				
+				idx += 1
+				pb2.update(idx)
 
+			pb2.finish()
 
+			# Select the image with the highest maximum value for its Laplacian
 			best_idx = np.argmax(max_laplace)
 			_max = np.array(max_laplace).max()
 			
 			focus_position = positions[best_idx]
-			print(focus_position)
-			# if self.verbose:
-			# 	print('', flush=True)
-			# 	d, = plt.plot(positions, max_laplace)
-			# 	e, = plt.plot(positions, mean_laplace)
-				
-			# 	plt.axvline(positions[best_idx])
-			# 	plt.legend([d, e], ["Max Laplace", "Mean Laplace"])
-			# 	plt.show()
-			
 
-			if self.verbose:
-				print('', flush=True)
-			
-
+			# Modify the focus range in case there is another pass to run.
 			width          = current_range[1] - current_range[0]
 			current_range  = (focus_position - width / 5, focus_position + width / 5)
 			
 
-		self.focus.setFocus(focus_position) 
+		self.focus.setFocus(focus_position)
 
-		self.camera.enableAutoExposure()
+		# If auto exposure was on when this was called, turn it back on.
+		if exposure_on:
+			self.camera.enableAutoExposure()
 
+		# Reset the motion paramters to their original values.
 		self.focus.setFocusAcceleration(focus_accel)
 		self.focus.setFocusInitialVelocity(focus_initial_v)
 		self.focus.setFocusMaxVelocity(focus_final_v)
 
-		return True
-
-
-
-	# This selects one sixteenth of the images pixels systematically
-	# and uses them to estimate the entropy of the image in nats.
-	def _get_image_entropy(self, img, breakdown):
-		img           = img[::breakdown, ::breakdown, :]
-		value, counts = np.unique(img, return_counts=True)
-		n             = img.shape[0] * img.shape[1] * img.shape[2]
-		P             = counts / n
-		
-		entropy = - (P * np.log(P)).sum()
-
-		return entropy
+		return focus_position
 
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt

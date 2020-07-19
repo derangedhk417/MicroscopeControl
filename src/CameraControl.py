@@ -21,9 +21,10 @@ class CameraController:
 		if not PxLApi.apiSuccess(ret[0]):
 			raise Exception("Unable to initialize a camera.")
 
-		self.camera_handle    = ret[1]
-		self.pixel_type       = 0      # PT_COLOR
-		self.raw_image_buffer = create_string_buffer(5000 * 5000 * 2)
+		self.camera_handle         = ret[1]
+		self.pixel_type            = 0      # PT_COLOR
+		self.raw_image_buffer      = create_string_buffer(5000 * 5000 * 2)
+		self.auto_exposure_enabled = False
 
 	# This needs to be called before capturing images from the camera.
 	def startCapture(self):
@@ -69,6 +70,8 @@ class CameraController:
 		)
 		if not PxLApi.apiSuccess(ret[0]):
 			raise Exception("Could not set auto-exposure to on.")
+		else:
+			self.auto_exposure_enabled = True
 
 	# Disabled automatic exposure adjustment.
 	def disableAutoExposure(self):
@@ -92,7 +95,9 @@ class CameraController:
 			params
 		)
 		if not PxLApi.apiSuccess(ret[0]):
-			raise Exception("Could not set auto-exposure to on.")
+			raise Exception("Could not set auto-exposure to off.")
+		else:
+			self.auto_exposure_enabled = False
 
 
 	def __del__(self):
@@ -105,7 +110,7 @@ class CameraController:
 	def _api_range_error(rc):
 		a = rc == PxLApi.ReturnCode.ApiInvalidParameterError
 		b = rc == PxLApi.ReturnCode.ApiOutOfRangeError
-    	return a or b
+		return a or b
 
 	def getExposure(self):
 		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.EXPOSURE)
