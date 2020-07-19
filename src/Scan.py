@@ -7,6 +7,7 @@ import argparse
 import os
 import cv2
 import json
+import threading
 import math
 
 #from MicroscopeControl  import MicroscopeController
@@ -35,11 +36,8 @@ def preprocess(args_specification):
 
 if __name__ == '__main__':
 	# Load the arguments file. 
-	try:
-		with open("Scan.json", 'r') as file:
-			args_specification = json.loads(file.read())
-	except Exception as ex:
-		raise ex
+	with open("Scan.json", 'r') as file:
+		args_specification = json.loads(file.read())
 
 	args = preprocess(args_specification)
 
@@ -187,6 +185,28 @@ if __name__ == '__main__':
 		y_current = y
 		microscope.stage.moveTo(x_current, y_current)
 
+		# We need a thread to be running constantly in order to process
+		# input events for the preview window. Otherwise, the OS will think
+		# it has crashed and will mark it as not responding.
+		running = False
+		def processWindowEvents():
+			while not running:
+				time.sleep(0.001)
+			while running:
+				cv2.waitKey(1)
+
+		event_thread = threading.Thread(target=processWindowEvents)
+		event_thread.start()
+
+		# Estimate the number of images necessary for this square.
+		n_total = int(((yhigh - y) * (xhigh - x)) / (args.image_height * args.image_width))
+		n_total = int(n_total * 1.1)
+
+		# This progress bar will update every time an image is taken and will
+		# attempt to estimate the total time remaining after 30 seconds.
+		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=30)
+		img_idx = 0
+
 		while x_current < xhigh:
 			while y_current < yhigh:
 				# Take an image
@@ -199,11 +219,13 @@ if __name__ == '__main__':
 					n_images, xc, yc
 				)
 				n_images += 1
+				img_idx  += 1
+				pb1.update(img_idx)
 				fname = os.path.join(args.output_directory, fstr)
 
 				decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
 				cv2.imshow('Scan Preview', decimated)
-				cv2.waitKey(1)
+				running   = True
 
 				cv2.imwrite(fname, img)
 				y_current += args.image_height
@@ -220,9 +242,11 @@ if __name__ == '__main__':
 				interp((x_current, y_current)), 
 				corrected=False
 			)
+		pb1.finish()
 
 		n_squares += 1
 
+	running = False
 
 	scanned_locations = np.array(scanned_locations)
 	plt.scatter(scanned_locations[:, 0], scanned_locations[:, 1], s=1)
