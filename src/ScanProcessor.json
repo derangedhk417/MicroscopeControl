@@ -1,0 +1,72 @@
+{
+	"description" : "Scan a specified area of a sample and save images to a specified directory.",
+	"arguments"   : [
+		{
+			"names" : ["-o", "--output"],
+			"spec"  : {
+				"dest"     : "output_directory",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The directory to write output files to. It will be created if it does not exist. This program will not write into a folder that is not empty."
+			}
+		},
+		{
+			"names" : ["-x", "--x-limits"],
+			"spec"  : {
+				"dest"     : "x_limits",
+				"nargs"    : 2,
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The minimum and maximum x-coordinates of the rectangle to sweep."
+			}
+		},
+		{
+			"names" : ["-y", "--y-limits"],
+			"spec"  : {
+				"dest"     : "y_limits",
+				"nargs"    : 2,
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The minimum and maximum y-coordinates of the rectangle to sweep."
+			}
+		},
+		{
+			"names" : ["-W", "--image-width"],
+			"spec"  : {
+				"dest"     : "image_width",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The width (along x-direction) of the image at the current zoom (mm)."
+			}
+		},
+		{
+			"names" : ["-H", "--image-height"],
+			"spec"  : {
+				"dest"     : "image_height",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The height (along y-direction) of the image at the current zoom (mm)."
+			}
+		},
+		{
+			"names" : ["-s", "--square-size"],
+			"spec"  : {
+				"dest"     : "square_size",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The length in millimeters of the square subdivisions to use. Make this larger than the scan area if you do not want to break the scan up into squares."
+			}
+		},
+		{
+			"names" : ["-fr", "--focus-range"],
+			"spec"  : {
+				"dest"     : "focus_range",
+				"nargs"    : 2,
+				"type"     : "float",
+				"default"  : [0.4, 0.6],
+				"required" : true,
+				"help"     : "The range of values to sweep when focusing the camera. This can often be the current focal point +/- 0.05. Only very uneven or very large samples will have their focal points vary by more than that."
+			}
+		}
+	]
+}
