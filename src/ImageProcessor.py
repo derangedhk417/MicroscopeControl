@@ -32,25 +32,46 @@ class ImageProcessor:
 		self.current_process = None
 		self.names           = None
 
+		# Whether or not to store the result of every operation
+		# so that they can be displayed.
+		self.no_store        = False
+
+	def noStore(self):
+		self.no_store = True
+		return self
+
 	def reset(self):
 		self.current_process = None
+		self.no_store        = False
 
 	def done(self):
-		proc = self.current_process
+		if self.no_store:
+			proc = self.current_process[0]
+		else:
+			proc = self.current_process
+		
 		self.reset()
+
 		return proc
+		
 
 	def denoise(self, strength):
 		if self.current_process is None:
 			self.current_process = [self.img]
 			self.names           = ["Original"]
 
-		self.current_process.append(cv2.fastNlMeansDenoisingColored(
+		res = cv2.fastNlMeansDenoisingColored(
 			self.current_process[-1], 
 			strength
-		))
+		)
 
-		self.names.append("Fast NL Means Denoised (strength = %d)"%strength)
+		if self.no_store:
+			self.current_process[-1] = res
+		else:
+			self.current_process.append(res)
+
+		if not self.no_store:
+			self.names.append("Fast NL Means Denoised (strength = %d)"%strength)
 
 		return self
 
@@ -62,15 +83,27 @@ class ImageProcessor:
 			self.names           = ["Original"]
 
 		lpl = cv2.Laplacian(self.current_process[-1], -1, ksize=3).max(axis=2)
-		self.current_process.append(lpl)
-		self.names.append("Laplacian Filter (Max Across Channels)")
+		if self.no_store:
+			self.current_process[-1] = lpl
+		else:
+			self.current_process.append(lpl)
+			self.names.append("Laplacian Filter (Max Across Channels)")
 
 		mask           = lpl < threshold
-		filtered       = lpl.copy()
+		if self.no_store:
+			filtered = lpl
+		else:
+			filtered       = lpl.copy()
+		
 		filtered[mask] = 0
 
-		self.current_process.append(filtered)
-		self.names.append("Laplacian Filter (Everything Below %d Removed)"%threshold)
+		if self.no_store:
+			self.current_process[-1] = filtered
+		else:
+			self.current_process.append(filtered)
+			self.names.append("Laplacian Filter (Everything Below %d Removed)"%(
+				threshold
+			))
 
 		return self
 
@@ -83,8 +116,11 @@ class ImageProcessor:
 
 		eroded = cv2.erode(self.current_process[-1], kernel)
 
-		self.current_process.append(eroded)
-		self.names.append("Eroded (%dx%d elliptical filter)"%(scale, scale))
+		if self.no_store:
+			self.current_process[-1] = eroded
+		else:
+			self.current_process.append(eroded)
+			self.names.append("Eroded (%dx%d elliptical filter)"%(scale, scale))
 
 		return self
 
@@ -95,10 +131,13 @@ class ImageProcessor:
 
 		kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (scale, scale))
 
+
 		dilated = cv2.dilate(self.current_process[-1], kernel)
-		
-		self.current_process.append(dilated)
-		self.names.append("Dilated (%dx%d elliptical filter)"%(scale, scale))
+		if self.no_store:
+			self.current_process[-1] = dilated
+		else:
+			self.current_process.append(dilated)
+			self.names.append("Dilated (%dx%d elliptical filter)"%(scale, scale))
 
 		return self
 
@@ -108,10 +147,18 @@ class ImageProcessor:
 			self.names           = ["Original"]
 
 		mask          = self.current_process[-1] > 0.0
-		leveled       = self.current_process[-1].copy()
+		if self.no_store:
+			leveled = self.current_process[-1]
+		else:
+			leveled = self.current_process[-1].copy()
+
 		leveled[mask] = 1
-		self.current_process.append(leveled)
-		self.names.append("Leveled")
+
+		if self.no_store:
+			self.current_process[-1] = leveled
+		else:
+			self.current_process.append(leveled)
+			self.names.append("Leveled")
 
 		return self
 
@@ -121,8 +168,12 @@ class ImageProcessor:
 			self.names           = ["Original"]
 
 		edged = cv2.Canny(self.current_process[-1], p1, p2)
-		self.current_process.append(edged)
-		self.names.append("Edge Detected (%d, %d)"%(p1, p2))
+
+		if self.no_store:
+			self.current_process[-1] = edged
+		else:
+			self.current_process.append(edged)
+			self.names.append("Edge Detected (%d, %d)"%(p1, p2))
 
 		return self
 
@@ -140,12 +191,39 @@ class ImageProcessor:
 			value=color
 		)
 
-		self.current_process.append(bordered)
-		self.names.append("Bordered")
+		if self.no_store:
+			self.current_process[-1] = bordered
+		else:
+			self.current_process.append(bordered)
+			self.names.append("Bordered")
 
 		return self
 
+	# Extracts the outermost contours from the images as arrays
+	# of 2d coordinates.
+	def extractContours(self, img):
+		contours, heirarchy = cv2.findContours(
+			img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+		)
+
+		# The format that opencv uses for contours is strange. Here,
+		# we reshape each array into a matrix of shape (n_points, 2).
+
+		contours = [c.reshape(-1, 2) for c in contours]
+		return contours
+
+	# Calculates the minimum bounding rectange for each contour.
+	# This includes rotation of the rectangle.
+	def calculateBoundingRectangles(self, contours):
+		# Here we reshape the contours back into the format that
+		# opencv expects before passing them to the function.
+		return [cv2.minAreaRect(c.reshape(-1, 1, 2)) for c in contours]
+
+
 	def display(self):
+		if self.no_store:
+			raise Exception("Current process is in no_store mode.")
+
 		for img, title in zip(self.current_process, self.names):
 			plt.imshow(img)
 			plt.title(title)
@@ -156,6 +234,37 @@ class ImageProcessor:
 if __name__ == '__main__':
 	imgname = sys.argv[1]
 
-	proc = ImageProcessor(cv2.imread(imgname), downscale=5)
+	original = cv2.imread(imgname)
 
-	proc.denoise(30).laplacian(28).dilate(4).erode(4).level().border(5, 0).edge(0, 1).dilate(2).display().done()
+	proc = ImageProcessor(original, downscale=5)
+
+	tmp = proc.noStore().denoise(30).laplacian(28).dilate(4).erode(4)
+	res = tmp.level().border(5, 0).edge(0, 1).dilate(2).done()
+
+
+	c   = proc.extractContours(res)
+	r   = proc.calculateBoundingRectangles(c)
+	img = proc.img
+
+	# Filter out everything smaller than this.
+	threshold = 14
+
+	filtered = []
+	for rect in r:
+		((left, top), (width, height), angle) = rect
+		largest = max(width, height)
+
+		left -= 5
+		top  -= 5
+
+		if largest > threshold:
+			filtered.append(((left, top), (width, height), angle))
+
+
+	for rect in filtered:
+		box = cv2.boxPoints(rect)
+		box = np.int0(box)
+		img = cv2.drawContours(img, [box], 0, (255, 0, 0), 2)
+
+	plt.imshow(img)
+	plt.show()

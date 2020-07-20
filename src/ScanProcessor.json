@@ -1,71 +1,32 @@
 {
-	"description" : "Scan a specified area of a sample and save images to a specified directory.",
+	"description" : "Monitors the specified directory for images and attempts to extract flake geometry from them. If configured correctly, this program will also delete images that don't contain any flakes in order to save disk space.",
 	"arguments"   : [
 		{
-			"names" : ["-o", "--output"],
+			"names" : ["-d", "--image-directory"],
 			"spec"  : {
-				"dest"     : "output_directory",
+				"dest"     : "image_directory",
 				"type"     : "str",
 				"required" : true,
-				"help"     : "The directory to write output files to. It will be created if it does not exist. This program will not write into a folder that is not empty."
+				"help"     : "The directory containing the images to process."
 			}
 		},
 		{
-			"names" : ["-x", "--x-limits"],
+			"names" : ["-np", "--n-processes"],
 			"spec"  : {
-				"dest"     : "x_limits",
-				"nargs"    : 2,
-				"type"     : "float",
+				"dest"     : "n_processes",
+				"type"     : "int",
 				"required" : true,
-				"help"     : "The minimum and maximum x-coordinates of the rectangle to sweep."
+				"help"     : "The number of concurrent processes to use when processing files. This program uses a process pool to delegate work to multiple cores and/or processors."
 			}
 		},
 		{
-			"names" : ["-y", "--y-limits"],
+			"names" : ["-rt", "--rejection-threshold"],
 			"spec"  : {
-				"dest"     : "y_limits",
-				"nargs"    : 2,
-				"type"     : "float",
-				"required" : true,
-				"help"     : "The minimum and maximum y-coordinates of the rectangle to sweep."
-			}
-		},
-		{
-			"names" : ["-W", "--image-width"],
-			"spec"  : {
-				"dest"     : "image_width",
-				"type"     : "float",
-				"required" : true,
-				"help"     : "The width (along x-direction) of the image at the current zoom (mm)."
-			}
-		},
-		{
-			"names" : ["-H", "--image-height"],
-			"spec"  : {
-				"dest"     : "image_height",
-				"type"     : "float",
-				"required" : true,
-				"help"     : "The height (along y-direction) of the image at the current zoom (mm)."
-			}
-		},
-		{
-			"names" : ["-s", "--square-size"],
-			"spec"  : {
-				"dest"     : "square_size",
-				"type"     : "float",
-				"required" : true,
-				"help"     : "The length in millimeters of the square subdivisions to use. Make this larger than the scan area if you do not want to break the scan up into squares."
-			}
-		},
-		{
-			"names" : ["-fr", "--focus-range"],
-			"spec"  : {
-				"dest"     : "focus_range",
-				"nargs"    : 2,
-				"type"     : "float",
-				"default"  : [0.4, 0.6],
-				"required" : true,
-				"help"     : "The range of values to sweep when focusing the camera. This can often be the current focal point +/- 0.05. Only very uneven or very large samples will have their focal points vary by more than that."
+				"dest"     : "rejection_threshold",
+				"type"     : "int",
+				"default"  : 0,
+				"required" : false,
+				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted."
 			}
 		}
 	]

@@ -1,0 +1,14 @@
+{
+	"description" : "Given a directory that has already been processed by ScanProcessor.py, this program will load all of the images and corresponding metadata from them and will produce a summary file containing the location of all of the flakes that it has found and their properties.",
+	"arguments"   : [
+		{
+			"names" : ["-d", "--image-directory"],
+			"spec"  : {
+				"dest"     : "image_directory",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The directory containing the images to process."
+			}
+		}
+	]
+}

@@ -7,11 +7,14 @@ from datetime import datetime
 # Returns the dimensions of the current terminal window or a good guess if 
 # something goes wrong.
 def terminal_dims():
-	try:
-		rows, columns = os.popen('stty size', 'r').read().split()
-		return int(rows), int(columns)
-	except:
-		return 90, 100
+	if os.name == 'nt':
+		return 90, 80
+	else:
+		try:
+			rows, columns = os.popen('stty size', 'r').read().split()
+			return int(rows), int(columns)
+		except:
+			return 90, 80
 
 class ProgressBar:
 	def __init__(self, prefix, prefix_width, total, update_every = 10, ea=15):
@@ -110,5 +113,8 @@ class ProgressBar:
 		# Using a \r character at the end of the line only works for
 		# some environments. Odds are that this will not work on windows
 		# but who cares.
-		sys.stdout.write("\033[K")
+		if os.name == 'nt':
+			print("", end='\r')
+		else:
+			sys.stdout.write("\033[K")
 		print(prefix + '[' + fill + space + ']' + ' ' + disp + ' ' + rem, end=_end)

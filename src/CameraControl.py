@@ -107,7 +107,7 @@ class CameraController:
 		ret = PxLApi.uninitialize(self.camera_handle)
 
 
-	def _api_range_error(rc):
+	def _api_range_error(self, rc):
 		a = rc == PxLApi.ReturnCode.ApiInvalidParameterError
 		b = rc == PxLApi.ReturnCode.ApiOutOfRangeError
 		return a or b

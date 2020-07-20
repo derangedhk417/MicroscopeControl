@@ -80,7 +80,7 @@ class MicroscopeController:
 				print("DONE")
 
 
-	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=True):
+	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False):
 		if ndiv < 5:
 			raise Exception("You must specify ndiv >= 5.")
 
@@ -163,7 +163,7 @@ class MicroscopeController:
 			for img in images:
 				# Convert the images to floating point format so that we can
 				# get the best possible precision on the Laplacians.
-				img = img.astype(np.float32)
+				
 				img = cv2.fastNlMeansDenoising(img, 20)
 				lpl = cv2.Laplacian(img, -1, ksize=3)
 				max_laplace.append(lpl.max())

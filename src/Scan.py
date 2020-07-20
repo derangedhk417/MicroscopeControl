@@ -10,7 +10,7 @@ import json
 import threading
 import math
 
-#from MicroscopeControl  import MicroscopeController
+from MicroscopeControl  import MicroscopeController
 from scipy.optimize     import curve_fit
 from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
@@ -142,11 +142,9 @@ if __name__ == '__main__':
 		# points in the square.
 		xlow  = x
 		xhigh = xh
-		x_r   = np.random.uniform(xlow, xhigh, args.n_focus)
 
 		ylow  = y
 		yhigh = yh
-		y_r   = np.random.uniform(ylow, yhigh, args.n_focus)
 
 		points = np.array([
 			[xlow, ylow],
@@ -185,26 +183,14 @@ if __name__ == '__main__':
 		y_current = y
 		microscope.stage.moveTo(x_current, y_current)
 
-		# We need a thread to be running constantly in order to process
-		# input events for the preview window. Otherwise, the OS will think
-		# it has crashed and will mark it as not responding.
-		running = False
-		def processWindowEvents():
-			while not running:
-				time.sleep(0.001)
-			while running:
-				cv2.waitKey(1)
-
-		event_thread = threading.Thread(target=processWindowEvents)
-		event_thread.start()
-
+		
 		# Estimate the number of images necessary for this square.
 		n_total = int(((yhigh - y) * (xhigh - x)) / (args.image_height * args.image_width))
 		n_total = int(n_total * 1.1)
 
 		# This progress bar will update every time an image is taken and will
 		# attempt to estimate the total time remaining after 30 seconds.
-		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=30)
+		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=120)
 		img_idx = 0
 
 		while x_current < xhigh:
@@ -225,7 +211,7 @@ if __name__ == '__main__':
 
 				decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
 				cv2.imshow('Scan Preview', decimated)
-				running   = True
+				cv2.waitKey(1)
 
 				cv2.imwrite(fname, img)
 				y_current += args.image_height
