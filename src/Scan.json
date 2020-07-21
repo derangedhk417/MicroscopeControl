@@ -1,5 +1,5 @@
 {
-	"description" : "Scan a specified area of a sample and save images to a specified directory.",
+	"description" : "Scan a specified area of a sample and save images to a specified directory. This program will maintain a process pool and dispatch images to subprocesses so that flake information can be extracted.",
 	"arguments"   : [
 		{
 			"names" : ["-o", "--output"],
@@ -66,6 +66,25 @@
 				"default"  : [0.4, 0.6],
 				"required" : true,
 				"help"     : "The range of values to sweep when focusing the camera. This can often be the current focal point +/- 0.05. Only very uneven or very large samples will have their focal points vary by more than that."
+			}
+		},
+		{
+			"names" : ["-np", "--n-processes"],
+			"spec"  : {
+				"dest"     : "n_processes",
+				"type"     : "int",
+				"required" : true,
+				"help"     : "The number of concurrent processes to use when processing files. This program uses a process pool to delegate work to multiple cores and/or processors."
+			}
+		},
+		{
+			"names" : ["-rt", "--rejection-threshold"],
+			"spec"  : {
+				"dest"     : "rejection_threshold",
+				"type"     : "int",
+				"default"  : 0,
+				"required" : false,
+				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted. At 100%% zoom, one pixel is roughly 200 nm by 200 nm."
 			}
 		}
 	]

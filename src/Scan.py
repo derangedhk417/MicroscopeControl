@@ -14,6 +14,9 @@ from MicroscopeControl  import MicroscopeController
 from scipy.optimize     import curve_fit
 from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
+from multiprocessing    import Pool
+from ImageProcessor     import ImageProcessor
+from ScanProcessing     import processFile
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):
@@ -33,6 +36,86 @@ def preprocess(args_specification):
 	args = parser.parse_args()
 
 	return args
+
+def subdivide(args):
+	# First, we'll create an array of locations corresponding to the
+	# top-left of each square we are going to scan.
+	locations = []
+	extents   = []
+	x   = args.x_limits[0]
+	xl  = args.x_limits[1] - args.x_limits[0]
+	y   = args.y_limits[0]
+	yl  = args.y_limits[1] - args.y_limits[0]
+	n_x = math.ceil(xl / args.square_size)
+	n_y = math.ceil(yl / args.square_size)
+
+	for i in range(n_x):
+		for j in range(n_y):
+			loc = [
+				x + args.square_size*i,
+				y + args.square_size*j
+			]
+			locations.append(loc)
+			extent = [
+				min(loc[0] + args.square_size, args.x_limits[1]),
+				min(loc[1] + args.square_size, args.y_limits[1]),
+			]
+			extents.append(extent)
+
+
+	locations = np.array(locations)
+	extents   = np.array(extents)
+
+	return locations, extents
+
+def calibrate_square(xrng, yrng, microscope):
+	xlow  = xrng[0]
+	xhigh = xrng[1]
+
+	ylow  = yrng[0]
+	yhigh = yrng[1]
+
+	points = np.array([
+		[xlow, ylow],
+		[xlow, yhigh],
+		[xhigh, ylow],
+		[xhigh, yhigh]
+	])
+
+	print("Performing focus calibration for square %d"%n_squares)
+	focal_points = []
+	for xp, yp in points:
+		print("Position: %f %f"%(xp, yp))
+		microscope.stage.moveTo(xp, yp)
+		microscope.autoFocus(args.focus_range)
+		focal_points.append(microscope.focus.getFocus())
+
+	focal_points = np.array(focal_points)
+
+	def fit(X, mx, my, b):
+		x, y = X
+		return mx*x + my*y + b
+
+	res, cov = curve_fit(fit, points.T, focal_points)
+
+	def interp(X):
+		return res[0]*X[0] + res[1]*X[1] + res[2]
+
+	rmse = np.sqrt(np.square(interp(points.T) - focal_points).mean())
+	print("The focal points have been fit to a function of the form z = ax + by + c.")
+	print("RMSE of fit: %f"%rmse)
+
+	if rmse > 0.002:
+		print("Fit too poor to continue.")
+		print("Please ensure that the corners of the ", end='')
+		print("scan region contain something to focus on.")
+		exit()
+
+	print("Focal Points")
+	for p in focal_points:
+		print(p)
+
+	return focal_points, interp
 
 if __name__ == '__main__':
 	# Load the arguments file. 
@@ -100,34 +183,7 @@ if __name__ == '__main__':
 	# Divide the search area up into squares. We will focus on 
 	# some number of random points in a square and take the average
 	# focus and use that for the whole square.
-
-	# First, we'll create an array of locations corresponding to the
-	# top-left of each square we are going to scan.
-	locations = []
-	extents   = []
-	x   = args.x_limits[0]
-	xl  = args.x_limits[1] - args.x_limits[0]
-	y   = args.y_limits[0]
-	yl  = args.y_limits[1] - args.y_limits[0]
-	n_x = math.ceil(xl / args.square_size)
-	n_y = math.ceil(yl / args.square_size)
-
-	for i in range(n_x):
-		for j in range(n_y):
-			loc = [
-				x + args.square_size*i,
-				y + args.square_size*j
-			]
-			locations.append(loc)
-			extent = [
-				min(loc[0] + args.square_size, args.x_limits[1]),
-				min(loc[1] + args.square_size, args.y_limits[1]),
-			]
-			extents.append(extent)
-
-
-	locations = np.array(locations)
-	extents   = np.array(extents)
+	locations, extents = subdivide(args)	
 	
 	n_squares = 0
 	n_images  = 0
@@ -136,45 +192,20 @@ if __name__ == '__main__':
 
 	scanned_locations = []
 
+	# Here we initialize a process pool to delegate image processing to.
+	process_pool = Pool(args.n_processes)
+
+	statuses = []
+
 	# Iterate over the locations.
 	for (x, y), (xh, yh) in zip(locations, extents):
 		# First we calibrate by focusing at several random
 		# points in the square.
-		xlow  = x
-		xhigh = xh
-
-		ylow  = y
-		yhigh = yh
-
-		points = np.array([
-			[xlow, ylow],
-			[xlow, yhigh],
-			[xhigh, ylow],
-			[xhigh, yhigh]
-		])
-
-		print("Performing focus calibration for square %d"%n_squares)
-		focal_points = []
-		for xp, yp in points:
-			print("Position: %f %f"%(xp, yp))
-			microscope.stage.moveTo(xp, yp)
-			microscope.autoFocus(args.focus_range)
-			focal_points.append(microscope.focus.getFocus())
-
-		focal_points = np.array(focal_points)
-
-		def fit(X, mx, my, b):
-			x, y = X
-			return mx*x + my*y + b
-
-		res, cov = curve_fit(fit, points.T, focal_points)
-
-		def interp(X):
-			return res[0]*X[0] + res[1]*X[1] + res[2]
-
-		rmse = np.sqrt(np.square(interp(points.T) - focal_points).mean())
-		print("The focal points have been fit to a function of the form z = ax + by + c.")
-		print("RMSE of fit: %f"%rmse)
+		focal_points, interp = calibrate_square(
+			[x, xh], 
+			[y, yh],
+			microscope
+		)
 
 		microscope.focus.setFocus(focal_points[0])
 
@@ -185,7 +216,7 @@ if __name__ == '__main__':
 
 		
 		# Estimate the number of images necessary for this square.
-		n_total = int(((yhigh - y) * (xhigh - x)) / (args.image_height * args.image_width))
+		n_total = int(((yh - y) * (xh - x)) / (args.image_height * args.image_width))
 		n_total = int(n_total * 1.1)
 
 		# This progress bar will update every time an image is taken and will
@@ -193,8 +224,8 @@ if __name__ == '__main__':
 		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=120)
 		img_idx = 0
 
-		while x_current < xhigh:
-			while y_current < yhigh:
+		while x_current < xh:
+			while y_current < yh:
 				# Take an image
 				xc, yc = microscope.stage.getPosition()
 				img    = microscope.camera.getFrame(convert=False)
@@ -214,6 +245,11 @@ if __name__ == '__main__':
 				cv2.waitKey(1)
 
 				cv2.imwrite(fname, img)
+
+				# Delegate this to a member of the process pool.
+				stat = process_pool.apply_async(processFile, (img, fname, args))
+				statuses.append(stat)
+
 				y_current += args.image_height
 				microscope.stage.moveTo(x_current, y_current)
 				microscope.focus.setFocus(
@@ -226,7 +262,7 @@ if __name__ == '__main__':
 			microscope.stage.moveTo(x_current, y_current)
 			microscope.focus.setFocus(
 				interp((x_current, y_current)), 
-				corrected=False
+				corrected=True
 			)
 		pb1.finish()
 
@@ -240,6 +276,17 @@ if __name__ == '__main__':
 	plt.show()
 
 	end = time.time_ns()
+
+	# Wait for all workers to finish.
+	while True:
+		done = True
+		for s in statuses:
+			if not s.successful():
+				done = False
+				time.sleep(0.01)
+
+		if done:
+			break
 
 	duration = ((end - start) / 1e9) / 60
 	print("Scan took %d minutes"%(int(duration)))

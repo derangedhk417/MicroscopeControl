@@ -136,7 +136,7 @@ class MicroscopeController:
 
 				return (base / n).astype(np.uint8)
 
-			pb1 = ProgressBar("Scanning Focus Range", 30, len(steps), 1, ea=2)
+			pb1 = ProgressBar("Scanning Focus Range", 30, len(steps), 1, ea=120)
 			idx = 0
 
 			images    = []
