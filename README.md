@@ -1,5 +1,9 @@
 # MicroscopeControl
 
+# TODO
+
+- Write routine for refinding flakes based on shape moments
+
 This repository contains the code necessary to control all of the components of the automated microscope being built at Dr. Patrick Vora's lab at George Mason University. This includes control of the motorized stage, zoom and focus motor and the camera attached to the optics. 
 
 **See the [Wiki](https://github.com/derangedhk417/MicroscopeControl/wiki) for details on each of the code files in this repo**
