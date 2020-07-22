@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 data/*
+*test*
+*110_sq_mm_scan_graphen_sio2*
+
 *quality_scan*
 
 # C extensions

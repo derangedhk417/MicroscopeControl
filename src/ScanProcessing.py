@@ -170,7 +170,7 @@ def processFile(img, fpath, args):
 			con[:, 1] = con[:, 1] / img.shape[0]
 
 			converted_contours.append(con.tolist())
-			converted_rects.append(box_points.tolist())
+			converted_rects.append([box_points.tolist(), r[2]])
 
 		results = {
 			"fname"    : fpath.split("\\")[-1],

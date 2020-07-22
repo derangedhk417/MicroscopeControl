@@ -7,11 +7,15 @@ import argparse
 import json
 import numpy             as np
 import matplotlib.pyplot as plt
+import multiprocessing   as mp
 
 from scipy.stats     import gaussian_kde
 from multiprocessing import Pool
 from ImageProcessor  import ImageProcessor
+from Progress        import ProgressBar
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.misc           import derivative
+from scipy.signal         import find_peaks_cwt, gaussian
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):
@@ -32,135 +36,13 @@ def preprocess(args_specification):
 
 	return args
 
-
-
-if __name__ == '__main__':
-	# Load the arguments file. 
-	with open("FindFlakes.json", 'r') as file:
-		args_specification = json.loads(file.read())
-
-	args = preprocess(args_specification)
-
-	# For now, load each image and draw the bounding boxes onto it.
-	files = []
-	for entry in os.listdir(args.image_directory):
-		ext = entry.split(".")[-1].lower()
-		if ext == 'png':
-			files.append(os.path.join(args.image_directory, entry))
-
-	# Load the image and its json metadata.
-	for file in files:
-		img  = cv2.imread(file)
-		json_path = ".".join(file.split(".")[:-1]) + '.json'
-		with open(json_path, 'r') as file:
-			data = json.loads(file.read())
-
-		rect_img = img.copy()
-		# Convert the relative coordinates to absolute coordinates
-		# and draw the bounding boxes onto the image.
-		for rect in data['rects']:
-			rect = np.array(rect)
-			rect[:, 0] *= img.shape[1]
-			rect[:, 1] *= img.shape[0]
-			rect        = rect.reshape(-1, 1, 2)
-			box   = np.int0(rect)
-			rect_img   = cv2.drawContours(rect_img, [box], 0, (255, 0, 0), 2) 
-
-		plt.imshow(rect_img)
-		plt.show()
-
-		
-		# Make a separate maske for each contour and print the variance
-		# within the contour before showing it on screen.
-		
-		# for c in data['contours']:
-		# 	mask  = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
-		# 	c_img = img.copy()
-		# 	con = np.array(c)
-
-		# 	con[:, 0] *= img.shape[1]
-		# 	con[:, 1] *= img.shape[0]
-		# 	con       -= 25 # TMP DELETE THIS
-		# 	con        = con.astype(np.int32)
-
-
-		# 	mask = cv2.fillPoly(mask, [con], 1)
-		# 	mask = mask.astype(np.uint8)
-
-		# 	# Erode the mask
-		# 	kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
-		# 	eroded = cv2.erode(mask, kernel)
-		# 	eroded[eroded > 0] = 1
-		# 	mask   = eroded
-			
-		# 	contour_img = cv2.drawContours(
-		# 		c_img, 
-		# 		[con.reshape(-1, 1, 2)], 
-		# 		0, (255, 0, 0), 2
-		# 	)
-		# 	plt.imshow(contour_img)
-		# 	plt.show()
-
-		# Make a mask image with all of the contours filled.
-		# mask = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
-
-		# for c in data['contours']:
-		# 	con = np.array(c)
-		# 	con[:, 0] *= img.shape[1]
-		# 	con[:, 1] *= img.shape[0]
-		# 	con        = con.astype(np.int32)
-
-		# 	mask = cv2.fillPoly(mask, [con], 1)
-
-		# mask = mask.astype(np.uint8)
-
-		# # Select all pixels outside the mask and average them.
-		# bg_mask  = mask == 0
-		# bg       = img[bg_mask]
-		# bg_color = bg.mean(axis=0)
-		# print(bg_color)
-
-		# # Make a background subtracted image and disaply it.
-		# bg_subtracted = (img.astype(np.float32) - bg_color)
-		# bg_subtracted[bg_subtracted < 3]   = 0
-		# bg_subtracted[bg_subtracted > 255] = 255
-		# bg_subtracted = bg_subtracted.astype(np.uint8)
-		# plt.imshow(bg_subtracted)
-		# plt.show()
-
-		# # Compute constrast by summing across all channels and
-		# # remove everything below 30
-
-		# contrast = cv2.cvtColor(bg_subtracted, cv2.COLOR_BGR2GRAY)
-		# contrast[contrast < 16] = 0
-
-		# proc = ImageProcessor(contrast, downscale=1, mode='GS')
-		# res  = proc.noStore().level().dilate(4).erode(4).border(5, 0).edge(0, 1).dilate(2).done()
-
-		# plt.imshow(res)
-		# plt.show()
-
-		# # Now we determine bounding boxes and remove everything thats too small.
-		# # Extract contours and bounding rectangles.
-		# c   = proc.extractContours(res)
-		# r   = proc.calculateBoundingRectangles(c)
-
-		
-		# filtered_rects    = []
-		# filtered_contours = []
-		# for rect, contour in zip(r, c):
-		# 	((left, top), (width, height), angle) = rect
-		# 	largest = max(width, height)
-
-		# 	# Correct for the border.
-		# 	left    -= 5
-		# 	top     -= 5
-		# 	contour -= 5
-
-		# 	if largest > 20:
-		# 		filtered_rects.append(((left, top), (width, height), angle))
-		# 		filtered_contours.append(contour)
-
+def processFile(file, args, display=False):
+	img       = cv2.imread(file)
+	json_path = ".".join(file.split(".")[:-1]) + '.json'
+	with open(json_path, 'r') as file:
+		data = json.loads(file.read())
+	
+	if display:
 		c_img = img.copy()
 		# Draw an image with a contour around every flake that we decided was good.
 		for con in data['contours']:
@@ -177,40 +59,201 @@ if __name__ == '__main__':
 		plt.imshow(c_img)
 		plt.show()	
 
-		# # Now we essentially perform the flake extraction again and determine
-		# # whether or not to keep the image.
-		# leveled = contrast.copy()
-		# leveled[leveled > 0] = 1
+	img = cv2.resize(img, (0, 0), fx=args.downscale, fy=args.downscale)
+	img = cv2.fastNlMeansDenoisingColored(
+		img, 
+		30
+	)
 
-		# bordered = cv2.copyMakeBorder(
-		# 	leveled, 
-		# 	width, 
-		# 	width, 
-		# 	width, 
-		# 	width, 
-		# 	cv2.BORDER_CONSTANT,
-		# 	value=color
-		# )
-		# edged = cv2.Canny(leveled, 0, 1)
+	contrast_data = []
+	mask_sum      = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
+	for i, c in enumerate(data['contours']):
+		mask = np.zeros((img.shape[0], img.shape[1])).astype(np.uint8)
+		con  = np.array(c)
+
+		con[:, 0] *= img.shape[1]
+		con[:, 1] *= img.shape[0]
+		con        = con.astype(np.int32)
+		mask       = cv2.fillPoly(mask, [con], 1)
+		mask       = mask.astype(np.uint8)
+
+		if display:
+			mask_sum = mask_sum + mask
+
+		bg       = np.array(data['bg_color'])
+		bg_subtracted = img - bg
+		contrast      = bg_subtracted / (bg + img)
+		contrast      = contrast[mask == 1].sum(axis=1)
+		#flakes.append({'file': file, 'flake_idx': i})
+		contrast_data.append(contrast.tolist())
+
+	if display:
+		plt.imshow(mask_sum)
+		plt.show()
+
+	return contrast_data
 
 
 
-		# contrast_small = cv2.resize(bg_subtracted, (0, 0), fx=0.03, fy=0.03)
-		# contrast_small = contrast_small.sum(axis=2)
-		# contrast_small[contrast_small < 30] = 0
+if __name__ == '__main__':
+	# Load the arguments file. 
+	with open("FindFlakes.json", 'r') as file:
+		args_specification = json.loads(file.read())
 
-		# X, Y = np.meshgrid(
-		# 	np.arange(contrast_small.shape[1]),
-		# 	np.arange(contrast_small.shape[0])
-		# )
+	args = preprocess(args_specification)
 
-		# Z = contrast_small
+	# For now, load each image and draw the bounding boxes onto it.
+	files = []
+	for entry in os.listdir(args.image_directory):
+		ext = entry.split(".")[-1].lower()
+		if ext == 'png':
+			files.append(os.path.join(args.image_directory, entry))
+
+	# Now we go through each flake in each image and extract all of the 
+	# contrast values so we can attempt to determine thickness.
+
+	# flakes        = []
+	# contrast_data = []
+
+	pb = ProgressBar("Processing ", 20, len(files), 1, ea=30)
 
 
-		# plt.imshow(contrast)
-		# plt.show()
+	if args.n_processes > 1:
+		pool = mp.Pool(args.n_processes)
 
-		# fig = plt.figure()
-		# ax = fig.add_subplot(111, projection='3d')
-		# ax.plot_surface(X, Y, Z, rstride=1, cstride=1, shade=False)
-		# plt.show()
+		contrast_data = []
+
+		current_in_process = 0
+		total_processed    = 0
+		idx                = 0
+		results            = []
+		while total_processed < len(files):
+
+			while current_in_process < args.n_processes and idx < len(files):
+				res = pool.apply_async(processFile, (files[idx], args))
+				results.append(res)
+				idx                += 1
+				current_in_process += 1
+
+			done = []
+			for r in results:
+				if r.ready():
+					v = r.get(0.01)
+					total_processed    += 1
+					current_in_process -= 1
+					pb.update(total_processed)
+					done.append(r)
+					contrast_data.append(v)
+
+			for d in done:
+				results.remove(d)
+
+			time.sleep(0.005)
+	else:
+		contrast_data = []
+		for idx, file in enumerate(files):
+			contrast_data.append(processFile(file, args, False))
+			pb.update(idx + 1)
+
+
+	pb.finish()
+
+	# Here we restructure this as a big flat array.
+	arrays = []
+	for a in contrast_data:
+		arrays.append(np.concatenate(tuple(a)))
+
+	contrast_data = np.concatenate(tuple(arrays))
+
+	contrast_data = np.random.choice(
+		contrast_data, 
+		min(100000, contrast_data.shape[0]), 
+		replace=False
+	)
+	kde = gaussian_kde(contrast_data, bw_method='silverman')
+
+	plt.hist(contrast_data, bins=200)
+	plt.show()
+
+	n = 512
+	x = np.linspace(-1, contrast_data.max(), n)
+	y = kde(x)
+
+	def wavelet(n, scale, **b):
+		return gaussian(n, scale * 0.7)
+
+
+	peaks     = find_peaks_cwt(y, np.arange(
+		5, 
+		15
+	), wavelet=wavelet, noise_perc=15)
+	positions = x[peaks]
+	print(peaks)
+
+	# Calculate the mean distance between subsequent peaks.
+	distances = []
+	last = positions[0]
+	for p in positions[1:]:
+		distances.append(p - last)
+		last = p
+	#code.interact(local=locals())
+
+	# positions = x[peaks]
+
+	# dx1 = []
+	# dx2 = []
+	# for p in x:
+	# 	dx1.append(derivative(kde, p, dx=1e-2, n=1))
+	#	dx2.append(derivative(kde, p, dx=1e-2, n=2))
+
+	orig, = plt.plot(x, y)
+	# d1,   = plt.plot(x, dx1)
+	# d2,   = plt.plot(x, dx2)
+	# plt.legend([orig, d1, d2], ["Distribution", "First Derivative", "Second Derivative"])
+	plt.title("Contrast Distribution")
+	plt.xlabel("Constrast")
+	plt.ylabel("Frequency")
+
+	for pos in positions:
+		plt.axvline(pos)
+
+	plt.show()
+
+
+
+
+	# c_img = bimg.copy()
+		# # Draw an image with a contour around every flake that we decided was good.
+		# for con in data['contours']:
+		# 	con = np.array(con)
+		# 	con[:, 0] = con[:, 0] * bimg.shape[1]
+		# 	con[:, 1] = con[:, 1] * bimg.shape[0]
+		# 	con = con.astype(np.int32)
+		# 	c_img = cv2.drawContours(
+		# 		c_img, 
+		# 		[con.reshape(-1, 1, 2)], 
+		# 		0, (255, 0, 0), 1
+		# 	)
+
+		# plt.imshow(c_img)
+		# plt.show()	
+
+
+
+	# c_img = img.copy()
+	# # Draw an image with a contour around every flake that we decided was good.
+	# for con in data['contours']:
+	# 	con = np.array(con)
+	# 	con[:, 0] = con[:, 0] * img.shape[1]
+	# 	con[:, 1] = con[:, 1] * img.shape[0]
+	# 	con = con.astype(np.int32)
+	# 	c_img = cv2.drawContours(
+	# 		c_img, 
+	# 		[con.reshape(-1, 1, 2)], 
+	# 		0, (255, 0, 0), 2
+	# 	)
+
+	# plt.imshow(c_img)
+	# plt.show()	
+
+		
