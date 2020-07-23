@@ -429,6 +429,14 @@ class FlakeExtractor:
 			contrast_mask = cv2.fillPoly(contrast_mask, [con], 1)
 
 
+		rgb      = bg_downscaled[contrast_mask == 1]
+		b_values = rgb[:, 0]
+		g_values = rgb[:, 1]
+		r_values = rgb[:, 2] 
+		results['r_values'] = r_values.tolist()
+		results['g_values'] = g_values.tolist()
+		results['b_values'] = b_values.tolist()
+
 		contrast_img = bg_downscaled / (bg_color + original_downscaled)
 		if DEBUG_DISPLAY:
 			debug_show(contrast_img, sys._getframe().f_lineno)

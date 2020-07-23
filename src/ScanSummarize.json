@@ -9,6 +9,25 @@
 				"required" : true,
 				"help"     : "The directory containing the images to process."
 			}
+		},
+		{
+			"names" : ["-np", "--n-processes"],
+			"spec"  : {
+				"dest"     : "n_processes",
+				"type"     : "int",
+				"required" : true,
+				"help"     : "The number of concurrent processes to use when processing files. This program uses a process pool to delegate work to multiple cores and/or processors."
+			}
+		},
+		{
+			"names" : ["-dim", "--image-dims"],
+			"spec"  : {
+				"dest"     : "image_dims",
+				"nargs"    : 2,
+				"type"     : "int",
+				"required" : true,
+				"help"     : "The width and height of the images, in pixels."
+			}
 		}
 	]
 }
