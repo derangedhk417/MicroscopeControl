@@ -1,0 +1,14 @@
+{
+	"description" : "Takes a folder containing scan images that have already been processed and displays information about the number of flakes found, the distribution of their contrast values, the distribution of their sizes and images of flakes (if requested).",
+	"arguments"   : [
+		{
+			"names" : ["-d", "--image-directory"],
+			"spec"  : {
+				"dest"     : "image_directory",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The directory containing the images to process."
+			}
+		}
+	]
+}

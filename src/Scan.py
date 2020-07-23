@@ -17,6 +17,7 @@ from Progress           import ProgressBar
 from multiprocessing    import Pool
 from ImageProcessor     import ImageProcessor
 from ScanProcessing     import processFile
+from datetime           import datetime
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):
@@ -124,6 +125,15 @@ if __name__ == '__main__':
 
 	args = preprocess(args_specification)
 
+	# Setup a structure to write meta information into when
+	# scanning.
+
+	meta_data = {
+		'arguments'  : args.__dict__,
+		'start_time' : str(datetime.now())
+	}
+
+
 	# Check the output directory.
 	if not os.path.exists(args.output_directory):
 		os.mkdir(args.output_directory)
@@ -146,6 +156,8 @@ if __name__ == '__main__':
 
 	scan_area  = (args.x_limits[1] - args.x_limits[0])
 	scan_area *= (args.y_limits[1] - args.y_limits[0])
+
+	meta_data['scan_area'] = scan_area
 
 	print("Preparing to scan the region:")
 	print("    x = %02.4f to %02.4f mm"%(args.x_limits[0], args.x_limits[1]))
@@ -183,7 +195,12 @@ if __name__ == '__main__':
 	# Divide the search area up into squares. We will focus on 
 	# some number of random points in a square and take the average
 	# focus and use that for the whole square.
-	locations, extents = subdivide(args)	
+	locations, extents = subdivide(args)
+
+	meta_data['squares'] = {
+		"locations" : locations.tolist(),
+		"extents"   : extents.tolist()
+	}
 	
 	n_squares = 0
 	n_images  = 0
@@ -196,6 +213,8 @@ if __name__ == '__main__':
 	process_pool = Pool(args.n_processes)
 
 	statuses = []
+
+	meta_data['image_files'] = []
 
 	# Iterate over the locations.
 	for (x, y), (xh, yh) in zip(locations, extents):
@@ -235,10 +254,15 @@ if __name__ == '__main__':
 				fstr  = '%06d_%2.5f_%2.5f.png'%(
 					n_images, xc, yc
 				)
+
 				n_images += 1
 				img_idx  += 1
 				pb1.update(img_idx)
 				fname = os.path.join(args.output_directory, fstr)
+				meta_data['image_files'].append({
+					'path'     : fstr,
+					'position' : [xc, yc]	
+				})
 
 				decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
 				cv2.imshow('Scan Preview', decimated)
@@ -281,7 +305,7 @@ if __name__ == '__main__':
 	while True:
 		done = True
 		for s in statuses:
-			if not s.successful():
+			if not s.ready():
 				done = False
 				time.sleep(0.01)
 
@@ -290,5 +314,10 @@ if __name__ == '__main__':
 
 	duration = ((end - start) / 1e9) / 60
 	print("Scan took %d minutes"%(int(duration)))
+
+	meta_data['end_time'] = str(datetime.now())
+
+	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
+		file.write(json.dumps(meta_data))
 
 	microscope.camera.endCapture()

@@ -375,8 +375,9 @@ class FlakeExtractor:
 
 		# Now we convert the contour and rectangle information into
 		# relative units.
-		converted_contours = []
-		converted_rects    = []
+		converted_contours  = []
+		converted_rects     = []
+		converted_rot_rects = []
 
 		for r, c in zip(corrected_rects, corrected_contours):
 			# Get the four points that represent the corners of the bounding
@@ -384,6 +385,15 @@ class FlakeExtractor:
 			box_points = cv2.boxPoints(r).astype(np.float32)
 			box_points[:, 0] = box_points[:, 0] / proc.img.shape[1]
 			box_points[:, 1] = box_points[:, 1] / proc.img.shape[0]
+
+			((left, top), (width, height), angle) = r
+			left = left / proc.img.shape[1]
+			top  = top  / proc.img.shape[0]
+
+			width  = width  / proc.img.shape[1]
+			height = height / proc.img.shape[0]
+
+			converted_rot_rects.append(((left, top), (width, height), angle))
 
 			con = c.astype(np.float32)
 			# Convert the contour points.
@@ -395,9 +405,10 @@ class FlakeExtractor:
 
 
 		results = {
-			"contours" : converted_contours,
-			"rects"    : converted_rects,
-			"bg_color" : bg_color.tolist()
+			"contours"  : converted_contours,
+			"rects"     : converted_rects,
+			"rot_rects" : converted_rot_rects,
+			"bg_color"  : bg_color.tolist()
 		}
 
 		bg_downscaled       = cv2.resize(bg_subtracted, (0, 0), fx=0.25, fy=0.25)
