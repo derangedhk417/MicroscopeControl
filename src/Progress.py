@@ -2,27 +2,29 @@ import os
 import sys
 import numpy as np
 import time
+import shutil
 from datetime import datetime
 
 # Returns the dimensions of the current terminal window or a good guess if 
 # something goes wrong.
 def terminal_dims():
-	if os.name == 'nt':
-		return 90, 80
-	else:
-		try:
-			rows, columns = os.popen('stty size', 'r').read().split()
-			return int(rows), int(columns)
-		except:
-			return 90, 80
+	s    = shutil.get_terminal_size()
+	cols = s.columns
+	rows = s.lines
+
+	return rows, cols
 
 class ProgressBar:
-	def __init__(self, prefix, prefix_width, total, update_every = 10, ea=15):
+	def __init__(self, prefix, prefix_width, total, update_every=5, ea=15, skip=5):
 		self.prefix         = prefix
 		self.prefix_width   = prefix_width
 		self.update_every   = update_every
 		self.estimate_after = ea
 		self.total          = total
+		self.skip           = skip # Wait this many seconds to start collecting timing data
+		                           # This is useful when a processor is auto-tuning its clock
+		                           # rate, because the first few iterations may be slower and
+		                           # not representative.
 		self.current        = 0.0
 		self.last           = 0.0
 		self.remaining      = 0
@@ -45,7 +47,7 @@ class ProgressBar:
 			work = int(self.current - self.last)
 			t = (datetime.now() - self.start_time).seconds
 			should_estimate = t > self.estimate_after
-			if work != 0:
+			if work != 0 and t > self.skip:
 				self.last      = self.current
 				timenow        = time.time()
 				timing         = timenow - self.last_time

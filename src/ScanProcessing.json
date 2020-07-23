@@ -23,10 +23,28 @@
 			"names" : ["-rt", "--rejection-threshold"],
 			"spec"  : {
 				"dest"     : "rejection_threshold",
-				"type"     : "int",
-				"default"  : 0,
+				"type"     : "float",
+				"default"  : 0.01,
 				"required" : false,
 				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted."
+			}
+		},
+		{
+			"names" : ["-ds", "--downscale"],
+			"spec"  : {
+				"dest"     : "downscale",
+				"type"     : "float",
+				"default"  : 5,
+				"help"     : "How much to downscale images along each dimension before processing."
+			}
+		},
+		{
+			"names" : ["-cf", "--contrast-floor"],
+			"spec"  : {
+				"dest"     : "contrast_floor",
+				"type"     : "int",
+				"default"  : 40,
+				"help"     : "Once a background subtracted image has been constructed, any pixel with a luminescence value less than this will be floored to zero."
 			}
 		}
 	]

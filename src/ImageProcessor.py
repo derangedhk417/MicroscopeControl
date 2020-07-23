@@ -6,6 +6,10 @@ import cv2
 import numpy             as np
 import matplotlib.pyplot as plt
 
+def debug_show(img, line):
+	plt.imshow(img)
+	plt.title("Line: %d"%line)
+	plt.show()
 
 # Provides all of the functionality necessary to take an image
 # and extract flake geometry from it. This class assumes that the
@@ -231,40 +235,213 @@ class ImageProcessor:
 
 		return self
 
-if __name__ == '__main__':
-	imgname = sys.argv[1]
+class FlakeExtractor:
+	def __init__(self, img, **kwargs):
+		self.img  = img
+		self.proc = ImageProcessor(
+			self.img, 
+			downscale=kwargs['downscale']
+		)
+		self.threshold      = kwargs['threshold']
+		self.contrast_floor = kwargs['contrast_floor'] 
 
-	original = cv2.imread(imgname)
+	def process(self, DEBUG_DISPLAY=False):
+		if DEBUG_DISPLAY:
+			debug_show(self.img, sys._getframe().f_lineno)
+		# This set of filters will produce good edges for the contour
+		# algorithm. The numerical parameters are based on the assumption
+		# that the image is 2448x2048 and that it is downscaled by a factor
+		# of 5.
+		if not DEBUG_DISPLAY:
+			tmp = self.proc.noStore().denoise(30).laplacian(28).dilate(4).erode(4)
+			res = tmp.level().border(5, 0).edge(0, 1).dilate(2).done()
+		else:
+			tmp = self.proc.denoise(30).laplacian(28).dilate(4).erode(4)
+			res = tmp.level().border(5, 0).edge(0, 1).dilate(2).display().done()[-1]
 
-	proc = ImageProcessor(original, downscale=5)
+		if DEBUG_DISPLAY:
+			debug_show(res, sys._getframe().f_lineno)
 
-	tmp = proc.noStore().denoise(30).laplacian(28).dilate(4).erode(4)
-	res = tmp.level().border(5, 0).edge(0, 1).dilate(2).done()
+		# Extract contours and bounding rectangles.
+		c   = self.proc.extractContours(res)
+		r   = self.proc.calculateBoundingRectangles(c)
+
+		# Correct the coordinates for the border we added.
+		corrected_rects    = []
+		corrected_contours = []
+		for rect, contour in zip(r, c):
+			((left, top), (width, height), angle) = rect
+
+			# Calculate the relative size of the largest dimension, making
+			# sure to use the units of the downscaled image.
+			if width > height:
+				largest = width / self.proc.img.shape[1]
+			else:
+				largest = height / self.proc.img.shape[0]
+
+			# Correct for the border.
+			left    -= 5
+			top     -= 5
+			contour -= 5
 
 
-	c   = proc.extractContours(res)
-	r   = proc.calculateBoundingRectangles(c)
-	img = proc.img
+			if largest > self.threshold:
+				corrected_rects.append(((left, top), (width, height), angle))
+				corrected_contours.append(contour)
 
-	# Filter out everything smaller than this.
-	threshold = 14
+		if len(corrected_rects) == 0:
+			# Return false to indicate that this image should be thrown out.
+			return False, None
 
-	filtered = []
-	for rect in r:
-		((left, top), (width, height), angle) = rect
-		largest = max(width, height)
-
-		left -= 5
-		top  -= 5
-
-		if largest > threshold:
-			filtered.append(((left, top), (width, height), angle))
+		# We now have what we need to subtract the background and compute contrast
+		# values. Once the background is subtracted, it becomes easier to determine
+		# what is garbage and what is not. This is mostly due to the fact that adhesive
+		# residue is usually darker than the background and flakes are almost always 
+		# brighter than the background.
 
 
-	for rect in filtered:
-		box = cv2.boxPoints(rect)
-		box = np.int0(box)
-		img = cv2.drawContours(img, [box], 0, (255, 0, 0), 2)
+		# Mask out the stuff that isn't background to compute the background color.
+		mask = np.zeros((
+			self.proc.img.shape[0], 
+			self.proc.img.shape[1]
+		)).astype(np.uint8)
 
-	plt.imshow(img)
-	plt.show()
+		for c in corrected_contours:
+			con  = np.array(c)
+			con  = con.astype(np.int32)
+			mask = cv2.fillPoly(mask, [con], 1)
+
+		mask = mask.astype(np.uint8)
+
+		if DEBUG_DISPLAY:
+			debug_show(mask, sys._getframe().f_lineno)
+
+		bg_mask  = mask == 0
+		bg       = self.proc.img[bg_mask]
+
+		bg_color = bg.mean(axis=0)
+
+		bg_subtracted = (self.img.astype(np.float32) - bg_color)
+		bg_subtracted[bg_subtracted < 3]   = 0
+		bg_subtracted[bg_subtracted > 255] = 255
+		bg_subtracted = bg_subtracted.astype(np.uint8)
+
+		bg_removed = cv2.cvtColor(bg_subtracted, cv2.COLOR_BGR2GRAY)
+		bg_removed[bg_removed < self.contrast_floor] = 0
+
+		# Now we reprocess flake boundaries.
+		proc = ImageProcessor(bg_removed, downscale=1, mode='GS')
+		if not DEBUG_DISPLAY:
+			tmp  = proc.noStore().level().erode(7)
+			res  = tmp.border(5, 0).edge(0, 1).dilate(2).done()
+		else:
+			tmp  = proc.level().erode(7)
+			res  = tmp.border(5, 0).edge(0, 1).dilate(2).display().done()[-1]
+
+		if DEBUG_DISPLAY:
+			debug_show(res, sys._getframe().f_lineno)
+
+		# Now we determine bounding boxes and remove everything thats too small.
+		# Extract contours and bounding rectangles.
+		c = proc.extractContours(res)
+		r = proc.calculateBoundingRectangles(c)
+
+		# Correct the coordinates for the border we added.
+		corrected_rects    = []
+		corrected_contours = []
+		for rect, contour in zip(r, c):
+			((left, top), (width, height), angle) = rect
+
+			# Calculate the relative size of the largest dimension, making
+			# sure to use the units of the downscaled image.
+			if width > height:
+				largest = width / proc.img.shape[1]
+			else:
+				largest = height / proc.img.shape[0]
+
+			# Correct for the border.
+			left    -= 5
+			top     -= 5
+			contour -= 5
+
+			if largest > self.threshold:
+				corrected_rects.append(((left, top), (width, height), angle))
+				corrected_contours.append(contour)
+
+		if len(corrected_rects) == 0:
+			# Return false to indicate that this image should be thrown out.
+			return False, None
+
+
+		# Now we convert the contour and rectangle information into
+		# relative units.
+		converted_contours = []
+		converted_rects    = []
+
+		for r, c in zip(corrected_rects, corrected_contours):
+			# Get the four points that represent the corners of the bounding
+			# rectangle and convert them.
+			box_points = cv2.boxPoints(r).astype(np.float32)
+			box_points[:, 0] = box_points[:, 0] / proc.img.shape[1]
+			box_points[:, 1] = box_points[:, 1] / proc.img.shape[0]
+
+			con = c.astype(np.float32)
+			# Convert the contour points.
+			con[:, 0] = con[:, 0] / proc.img.shape[1]
+			con[:, 1] = con[:, 1] / proc.img.shape[0]
+
+			converted_contours.append(con.tolist())
+			converted_rects.append(box_points.tolist())
+
+
+		results = {
+			"contours" : converted_contours,
+			"rects"    : converted_rects,
+			"bg_color" : bg_color.tolist()
+		}
+
+		bg_downscaled       = cv2.resize(bg_subtracted, (0, 0), fx=0.25, fy=0.25)
+		original_downscaled = cv2.resize(self.img, (0, 0), fx=0.25, fy=0.25)
+
+		# Create a mask that contains all of the flakes and extract the contrast
+		# values from them.
+		contrast_mask = np.zeros((
+			bg_downscaled.shape[0], 
+			bg_downscaled.shape[1]
+		)).astype(np.uint8)
+
+		for contour in results['contours']:
+			con  = np.array(contour)
+			con[:, 0] *= bg_downscaled.shape[1]
+			con[:, 1] *= bg_downscaled.shape[0]
+			con  = con.astype(np.int32)
+			contrast_mask = cv2.fillPoly(contrast_mask, [con], 1)
+
+
+		contrast_img = bg_downscaled / (bg_color + original_downscaled)
+		if DEBUG_DISPLAY:
+			debug_show(contrast_img, sys._getframe().f_lineno)
+
+		contrast     = contrast_img[contrast_mask == 1].sum(axis=1)
+		results['contrast_values'] = contrast.tolist()
+
+		if DEBUG_DISPLAY:
+			# Overlay the contours on the original image.
+			c_img = self.img.copy()
+			# Draw an image with a contour around every flake that we decided was good.
+			for con in results['contours']:
+				con = np.array(con)
+				con[:, 0] = con[:, 0] * self.img.shape[1]
+				con[:, 1] = con[:, 1] * self.img.shape[0]
+				con = con.astype(np.int32)
+				c_img = cv2.drawContours(
+					c_img, 
+					[con.reshape(-1, 1, 2)], 
+					0, (255, 0, 0), 2
+				)
+
+			plt.imshow(c_img)
+			plt.title("Line: %d"%sys._getframe().f_lineno)
+			plt.show()	
+
+		return True, results
