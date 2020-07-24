@@ -452,7 +452,7 @@ class FlakeExtractor:
 
 		contrast_img = bg_downscaled / (bg_color + original_downscaled)
 		if DEBUG_DISPLAY:
-			debug_show(contrast_img, sys._getframe().f_lineno)
+			debug_show(contrast_img.sum(axis=2), sys._getframe().f_lineno)
 
 		contrast     = contrast_img[contrast_mask == 1].sum(axis=1)
 		results['contrast_values'] = contrast.tolist()
