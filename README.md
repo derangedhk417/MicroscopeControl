@@ -2,7 +2,10 @@
 
 # TODO
 
-- Write routine for refinding flakes based on shape moments
+- Write routine for refinding flakes based on shape moments.
+- Write auto calibrate program so that image physical dimensions can be accurately determined.
+- Add flake library viewer functionality to ScanSummarize.py
+
 
 This repository contains the code necessary to control all of the components of the automated microscope being built at Dr. Patrick Vora's lab at George Mason University. This includes control of the motorized stage, zoom and focus motor and the camera attached to the optics. 
 
