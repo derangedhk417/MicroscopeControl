@@ -5,6 +5,7 @@ import time
 import cv2
 import argparse
 import json
+import shutil
 import numpy             as np
 import matplotlib.pyplot as plt
 
@@ -70,7 +71,11 @@ def processFile(img, fpath, args):
 		contrast_floor=args.contrast_floor
 	)
 
-	status, res = extractor.process()
+	status, res = extractor.process(DEBUG_DISPLAY=args.debug_display)
+
+	del_dir = os.path.join(args.image_directory, "deleted")
+	if not os.isdir(del_dir):
+		os.mkdir(del_dir)
 
 	if status:
 		outfile = ".".join(fpath.split("\\")[-1].split(".")[:-1]) + '.json'
@@ -79,7 +84,9 @@ def processFile(img, fpath, args):
 			file.write(json.dumps(res))
 		return True, None
 	else:
-		os.remove(fpath)
+		path, file = os.path.split(fpath)
+		delpath    = os.path.join(path, "deleted", file)
+		shutil.move(fpath, delpath)
 		return False, fpath
 
 

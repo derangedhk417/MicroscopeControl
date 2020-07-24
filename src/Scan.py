@@ -210,7 +210,8 @@ if __name__ == '__main__':
 	scanned_locations = []
 
 	# Here we initialize a process pool to delegate image processing to.
-	process_pool = Pool(args.n_processes)
+	if not args.dont_process:
+		process_pool = Pool(args.n_processes)
 
 	statuses = []
 
@@ -270,9 +271,10 @@ if __name__ == '__main__':
 
 				cv2.imwrite(fname, img)
 
-				# Delegate this to a member of the process pool.
-				stat = process_pool.apply_async(processFile, (img, fname, args))
-				statuses.append(stat)
+				if not args.dont_process:
+					# Delegate this to a member of the process pool.
+					stat = process_pool.apply_async(processFile, (img, fname, args))
+					statuses.append(stat)
 
 				y_current += args.image_height
 				microscope.stage.moveTo(x_current, y_current)
@@ -301,16 +303,17 @@ if __name__ == '__main__':
 
 	end = time.time_ns()
 
-	# Wait for all workers to finish.
-	while True:
-		done = True
-		for s in statuses:
-			if not s.ready():
-				done = False
-				time.sleep(0.01)
+	if not args.dont_process:
+		# Wait for all workers to finish.
+		while True:
+			done = True
+			for s in statuses:
+				if not s.ready():
+					done = False
+					time.sleep(0.01)
 
-		if done:
-			break
+			if done:
+				break
 
 	duration = ((end - start) / 1e9) / 60
 	print("Scan took %d minutes"%(int(duration)))

@@ -46,6 +46,14 @@
 				"default"  : 40,
 				"help"     : "Once a background subtracted image has been constructed, any pixel with a luminescence value less than this will be floored to zero."
 			}
+		},
+		{
+			"names" : ["-dd", "--debug-display"],
+			"spec"  : {
+				"dest"     : "debug_display",
+				"action"   : "store_true",
+				"help"     : "Display each image at every step in the flake extraction process with line numbers. This is useful for calibrating values like the noise floor and the rejection threshold."
+			}
 		}
 	]
 }

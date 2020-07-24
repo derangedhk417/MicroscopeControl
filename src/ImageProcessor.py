@@ -327,6 +327,8 @@ class FlakeExtractor:
 		bg_subtracted = bg_subtracted.astype(np.uint8)
 
 		bg_removed = cv2.cvtColor(bg_subtracted, cv2.COLOR_BGR2GRAY)
+		if DEBUG_DISPLAY:
+			debug_show(bg_removed, sys._getframe().f_lineno)
 		bg_removed[bg_removed < self.contrast_floor] = 0
 
 		# Now we reprocess flake boundaries.

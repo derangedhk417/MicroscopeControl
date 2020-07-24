@@ -86,6 +86,42 @@
 				"required" : false,
 				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted. At 100%% zoom, one pixel is roughly 200 nm by 200 nm."
 			}
+		},
+		{
+			"names" : ["-cf", "--contrast-floor"],
+			"spec"  : {
+				"dest"     : "contrast_floor",
+				"type"     : "int",
+				"default"  : 40,
+				"help"     : "Once a background subtracted image has been constructed, any pixel with a luminescence value less than this will be floored to zero."
+			}
+		},
+		{
+			"names" : ["-ds", "--downscale"],
+			"spec"  : {
+				"dest"     : "downscale",
+				"type"     : "float",
+				"default"  : 5,
+				"help"     : "How much to downscale images along each dimension before processing."
+			}
+		},
+		{
+			"names" : ["-rt", "--rejection-threshold"],
+			"spec"  : {
+				"dest"     : "rejection_threshold",
+				"type"     : "int",
+				"default"  : 0,
+				"required" : false,
+				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted. At 100%% zoom, one pixel is roughly 200 nm by 200 nm."
+			}
+		},
+		{
+			"names" : ["-dp", "--dont-process"],
+			"spec"  : {
+				"dest"     : "dont_process",
+				"action"   : "store_true",
+				"help"     : "Only save images to the disk, don't process them. This is useful if you are unsure of what noise floor or rejection threshold to use."
+			}
 		}
 	]
 }
