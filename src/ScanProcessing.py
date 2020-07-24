@@ -1,3 +1,16 @@
+# Author:      Adam Robinson
+# Description: This file contains the logic used by Scan.py to process images
+#              as they are acquired. It can also be run as a standalone command
+#              line program to process a folder of images that has not yet been
+#              processed. This program will move images to a folder called 
+#              "deleted", if they don't appear to conatain any flakes whose 
+#              largest bounding box dimension is greater than or equal to 
+#              the --rejection-threshold parameter (relative to image dimensions).
+#
+#              This program runs efficiently using multiple subprocesses. The speedup
+#              is linearly related to the number of subprocesses up to the number of
+#              cores on your systems CPU. 
+
 import code
 import sys
 import os
@@ -74,7 +87,7 @@ def processFile(img, fpath, args):
 	status, res = extractor.process(DEBUG_DISPLAY=args.debug_display)
 
 	del_dir = os.path.join(args.image_directory, "deleted")
-	if not os.isdir(del_dir):
+	if not os.path.isdir(del_dir):
 		os.mkdir(del_dir)
 
 	if status:

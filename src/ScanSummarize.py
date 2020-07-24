@@ -1,3 +1,14 @@
+# Author:      Adam Robinson
+# Description: This program takes a directory of images that have already
+#              been processed by ScanProcessing.py or Scan.py and summarizes
+#              the distribution of flake sizes and flake contrast values.
+#              The current plan is to add flake library viewing functionality
+#              to this program. This will include allowing a user to specify
+#              a range of contrast values and flake sizes to view and then
+#              displaying a GUI that allows them to flip through images sorted
+#              by some factor of their choosing.
+
+
 import matplotlib.pyplot as plt
 import numpy             as np
 import sys
@@ -198,45 +209,3 @@ if __name__ == '__main__':
 	plt.ylabel("P(Contrast)")
 	plt.title("Normalized Contrast Distribution (Kernel Density Estimate)")
 	plt.show()
-
-
-	# # Make a multiseries plot of the color values.
-	# r_values = np.random.choice(
-	# 	rs,
-	# 	min(200000, len(rs)),
-	# 	replace=False
-	# )
-	# rkde = gaussian_kde(r_values, bw_method='silverman')
-
-	# b_values = np.random.choice(
-	# 	bs,
-	# 	min(200000, len(bs)),
-	# 	replace=False
-	# )
-	# bkde = gaussian_kde(b_values, bw_method='silverman')
-
-	# g_values = np.random.choice(
-	# 	gs,
-	# 	min(200000, len(gs)),
-	# 	replace=False
-	# )
-	# gkde = gaussian_kde(g_values, bw_method='silverman')
-
-	# xrng = np.linspace(
-	# 	max(min(r_values.min(), g_values.min(), b_values.min()), 20),
-	# 	max(r_values.max(), g_values.max(), b_values.max()),
-	# 	512
-	# )
-	# ry = rkde(xrng)
-	# gy = gkde(xrng)
-	# by = bkde(xrng)
-
-	# r, = plt.plot(xrng, ry, c='red')
-	# g, = plt.plot(xrng, gy, c='green')
-	# b, = plt.plot(xrng, by, c='blue')
-
-	# plt.xlabel("Color Value")
-	# plt.ylabel("P(Color Value)")
-	# plt.title("Flake Color Distribution (Gaussian Kernel Density Estimate)")
-	# plt.show()
-

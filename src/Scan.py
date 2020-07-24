@@ -1,3 +1,21 @@
+# Author:      Adam Robinson
+# Description: This program uses the MicroscopeController class to systematically
+#              sweep a sample and image every part of it in a rectangle defined by
+#              the user. It is expected that the user will have set the motors focus
+#              position somewhere near the middle of its range and that they have
+#              manually focused it using the z-stage at some point in the sample.
+#              From there, the system will auto-focus by sweeping a range of motor
+#              positions near the current position (range specified by user). This
+#              program does not modify the exposure setting of the camera and expects
+#              the user to ensure that there is reasonable exposure before running
+#              the program. 
+#
+#              Unless the --dont-process flag is passed at the command line, this 
+#              program will spawn multiple child processes to asynchronously extract
+#              flake information from images as they are taken. This process is 
+#              generally much faster than image acquisition and does not slow down
+#              the scanning process.
+
 import matplotlib.pyplot as plt
 import numpy             as np
 import sys

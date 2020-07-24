@@ -1,3 +1,8 @@
+# Author:      Adam Robinson
+# Description: This is a simple console progress bar that attempts to
+#              estimate the amount of time remaining in an operation by
+#              recording the time between steps.
+
 import os
 import sys
 import numpy as np
@@ -28,7 +33,7 @@ class ProgressBar:
 		self.current        = 0.0
 		self.last           = 0.0
 		self.remaining      = 0
-		self.width          = terminal_dims()[1] - 55
+		self.width          = terminal_dims()[1] - 62
 		self.estimate       = True
 		self.start_time     = datetime.now()
 		self.update_count   = 0

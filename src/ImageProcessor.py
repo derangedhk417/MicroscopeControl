@@ -1,3 +1,14 @@
+# Author:      Adam Robinson
+# Description: This file contains two classes. ImageProcessor allows a user 
+#              to succinctly express a series of filters and transformations
+#              applied to an image. It also provides functionality for contour
+#              extraction and viewing of all of the steps in a multi-step
+#              image filtering operation.
+#
+#              FlakeExtractor uses ImageProcessor to actually extract flake 
+#              geometry and some other properties from an image. 
+
+
 import code
 import sys
 import os
