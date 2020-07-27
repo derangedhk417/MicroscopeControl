@@ -327,17 +327,20 @@ class FlakeExtractor:
 		if DEBUG_DISPLAY:
 			debug_show(mask, sys._getframe().f_lineno)
 
+		rgb_image = cv2.cvtColor(self.proc.img, cv2.COLOR_HSV2RGB)
+
 		bg_mask  = mask == 0
-		bg       = self.proc.img[bg_mask]
+		bg       = rgb_image[bg_mask]
 
 		bg_color = bg.mean(axis=0)
 
-		bg_subtracted = (self.img.astype(np.float32) - bg_color)
-		bg_subtracted[bg_subtracted < 3]   = 0
+		rbg_image     = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
+		bg_subtracted = (rbg_image.astype(np.float32) - bg_color)
+		bg_subtracted[bg_subtracted < 0]   = 0
 		bg_subtracted[bg_subtracted > 255] = 255
 		bg_subtracted = bg_subtracted.astype(np.uint8)
 
-		bg_removed = cv2.cvtColor(bg_subtracted, cv2.COLOR_BGR2GRAY)
+		bg_removed = cv2.cvtColor(bg_subtracted, cv2.COLOR_RGB2GRAY)
 		if DEBUG_DISPLAY:
 			debug_show(bg_removed, sys._getframe().f_lineno)
 		bg_removed[bg_removed < self.contrast_floor] = 0

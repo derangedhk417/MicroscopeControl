@@ -78,16 +78,6 @@
 			}
 		},
 		{
-			"names" : ["-rt", "--rejection-threshold"],
-			"spec"  : {
-				"dest"     : "rejection_threshold",
-				"type"     : "int",
-				"default"  : 0,
-				"required" : false,
-				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted. At 100%% zoom, one pixel is roughly 200 nm by 200 nm."
-			}
-		},
-		{
 			"names" : ["-cf", "--contrast-floor"],
 			"spec"  : {
 				"dest"     : "contrast_floor",
