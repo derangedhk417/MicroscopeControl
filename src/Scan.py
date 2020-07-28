@@ -98,7 +98,8 @@ def calibrate_square(xrng, yrng, microscope):
 		[xlow, ylow],
 		[xlow, yhigh],
 		[xhigh, ylow],
-		[xhigh, yhigh]
+		[xhigh, yhigh],
+		[(xlow+xhigh)/2,(ylow+yhigh)/2]
 	])
 
 	print("Performing focus calibration for square %d"%n_squares)

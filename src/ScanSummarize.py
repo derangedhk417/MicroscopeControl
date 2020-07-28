@@ -24,6 +24,7 @@ import math
 from Progress        import ProgressBar
 from multiprocessing import Pool
 from scipy.stats     import gaussian_kde
+from scipy.signal    import ricker, convolve, cwt
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):
@@ -148,6 +149,8 @@ if __name__ == '__main__':
 
 	pb.finish()
 
+	print("Total flakes identified: %d"%len(surface_areas))
+
 	# surface_areas   = []
 	# contrast_values = [] 
 	# for idx, file in enumerate(meta_files):
@@ -180,10 +183,11 @@ if __name__ == '__main__':
 	# pb.finish()
 
 	# Make a log x-scale plot of the distribution of flake sizes.
-	plt.hist(np.log(surface_areas), bins=75)
-	plt.xlabel("Surface Area in Square Pixels (log scale)")
-	plt.ylabel("Count")
-	plt.title("Flake Sizes")
+	fig, ax = plt.subplots(1, 1)
+	ax.hist(np.log(surface_areas), bins=75)
+	ax.set_xlabel("Surface Area in Square Pixels (log scale)")
+	ax.set_ylabel("Count")
+	ax.set_title("Flake Sizes")
 	plt.show()
 
 	# Make a histogram of contrast values.
@@ -201,11 +205,39 @@ if __name__ == '__main__':
 	)
 	kde = gaussian_kde(contrast_values, bw_method='silverman')
 
-	xrng = np.linspace(contrast_values.min(), contrast_values.max(), 512)
+	n_points = 512
+	xrng = np.linspace(contrast_values.min(), contrast_values.max(), n_points)
 	y    = kde(xrng)
 
-	plt.plot(xrng, y)
-	plt.xlabel("Contrast")
-	plt.ylabel("P(Contrast)")
-	plt.title("Normalized Contrast Distribution (Kernel Density Estimate)")
+	fig, (ax1, ax2) = plt.subplots(1, 2)
+
+	ax1.plot(xrng, y)
+	ax1.set_xlabel("Contrast")
+	ax1.set_ylabel("P(Contrast)")
+	ax1.set_title("Normalized Contrast Distribution (Kernel Density Estimate)")
+
+	# # We'll use a Ricker wavelet to enhance the peaks of the 
+	# # distribution. This should assist us in eliminating noise
+	# # and determining the contrast values that correspond to 
+	# # certain thicknesses.
+
+	def RickerWavelet(n, sigma):
+		return ricker(n, sigma)
+
+
+
+
+	_rng        = contrast_values.max() - contrast_values.min()
+	widths      = np.linspace(
+		max(int(_rng / 20), 1), 
+		int(_rng / 2), 
+		n_points
+	)
+	transformed = cwt(y, RickerWavelet, widths) 
+
+	ax2.imshow(transformed, cmap='Greys')
+	ax2.set_xlabel("Contrast")
+	ax2.set_ylabel("Wavelet Width")
+	ax2.set_title("Continuous Wavelet Transform with Ricker Wavelet")
 	plt.show()
+

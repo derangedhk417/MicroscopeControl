@@ -8,7 +8,7 @@ import readline
 import cmd
 import sys
 import cv2
-import threading
+from threading import Thread
 import time
 
 
@@ -30,7 +30,7 @@ class MicroscopeShell(cmd.Cmd):
 			self.microscope.camera.startCapture()
 
 			self.stop = False
-			self.preview_thread = threading.Thread(
+			self.preview_thread = Thread(
 				target=self._preview_loop
 			)
 
