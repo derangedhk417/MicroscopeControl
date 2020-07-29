@@ -85,7 +85,7 @@ class FocusController:
 			except Exception as ex:
 				cb(ex, None)
 
-			time.sleep(0.01)
+			time.sleep(0.150)
 
 		
 
@@ -459,7 +459,7 @@ class FocusController:
 		return (zoom - self.zoom_range[0]) / (self.zoom_range[1] - self.zoom_range[0])
 
 	# Retrieve the current position of the focus motor.
-	def getFocus(self):
+	def getFocus(self, cb=None):
 		if cb is None:
 			return self._getFocus()
 		else:

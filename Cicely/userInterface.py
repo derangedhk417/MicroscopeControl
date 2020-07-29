@@ -18,6 +18,7 @@ from kivy.config     import Config
 from kivy.core.window import Window
 from kivy.clock           import Clock
 from threading import Thread
+from kivy.uix.gridlayout import GridLayout
 
 import sys
 sys.path.append("..\\src")
@@ -43,28 +44,65 @@ class accordionWidget(Accordion):
 
         box2 = BoxLayout(orientation='vertical')
 
-        label1 = BoxLayout(orientation='horizontal')
-        zoomLabel = Label(text='Zoom',size_hint_x=1)
-        zoomSlider = Slider(min=0.005, max=0.995, value=0.5,size_hint_x=10)
-        box2.add_widget(label1)
-        label1.add_widget(zoomLabel)
-        label1.add_widget(zoomSlider)
-        zoomSlider.bind(value=self.setZoom)
+        instructions = Label(text='Enter a value between 0 and 1',size_hint_y=1)
+        box2.add_widget(instructions)
 
-        label2 = BoxLayout(orientation='horizontal')
-        focusLabel = Label(text='Focus',size_hint_x=1)
-        focusSlider = Slider(min=0, max=100, value=0.5,size_hint_x=10)
+        label1       = BoxLayout(orientation='horizontal',size_hint_y=1)
+        zoomLabel    = Label(text='Zoom',size_hint_x=None,width=100, size_hint_y=None, height=40)
+        ZminusButton = Button(text='-',size_hint_x=None,width=30,size_hint_y=None,height=40)
+        self.zoomInput    = TextInput(text='0.005',multiline=False,size_hint_x=None,width=100,size_hint_y=None,height=40)
+        ZplusButton  = Button(text='+',size_hint_x=None,width=30,size_hint_y=None,height=40)
+        label1.add_widget(zoomLabel)
+        label1.add_widget(ZminusButton)
+        label1.add_widget(self.zoomInput)
+        label1.add_widget(ZplusButton)
+        box2.add_widget(label1)
+        self.zoomInput.bind(on_text_validate=self.setZoom)
+        ZminusButton.bind(on_release=self.incrementZoomMinus)
+        ZplusButton.bind(on_release=self.incrementZoomPlus)
+
+        instructions2 = Label(text='Enter a value between 0 and 1',size_hint_y=1)
+        box2.add_widget(instructions2)
+
+        label2 = BoxLayout(orientation='horizontal',size_hint_y=1)
+        focusLabel = Label(text='Focus',size_hint_x=None, width=100,size_hint_y=None,height=40)
+        FminusButton = Button(text='-',size_hint_x=None,width=30,size_hint_y=None,height=40)
+        self.focusInput = TextInput(text='0.005',multiline=False,size_hint_x=None,width=100,size_hint_y=None,height=40)
+        FplusButton = Button(text='+',size_hint_x=None,width=30,size_hint_y=None,height=40)
         box2.add_widget(label2)
         label2.add_widget(focusLabel)
-        label2.add_widget(focusSlider)
-        focusSlider.bind(value=self.setFocus)
+        label2.add_widget(FminusButton)
+        label2.add_widget(self.focusInput)
+        label2.add_widget(FplusButton)
+        self.focusInput.bind(on_text_validate=self.setFocus)
+        FminusButton.bind(on_release=self.incrementFocusMinus)
+        FplusButton.bind(on_release=self.incrementFocusPlus)
 
         item2.add_widget(box2)
 
         self.add_widget(item2)
 
         item3 = AccordionItem(title='Stage Control')
-        item3.add_widget(Slider(min=-100, max=100, value=25))
+
+        gridLayout = GridLayout(cols=3)
+        gridLayout.add_widget(Button(opacity=0))
+        moveUp = Button(text='Up')
+        gridLayout.add_widget(moveUp)
+        gridLayout.add_widget(Button(opacity=0))
+        moveLeft = Button(text='Left')
+        gridLayout.add_widget(moveLeft)
+        gridLayout.add_widget(Button(opacity=0))
+        moveRight = Button(text='Right')
+        gridLayout.add_widget(moveRight)
+        gridLayout.add_widget(Button(opacity=0))
+        moveDown = Button(text='Down')
+        gridLayout.add_widget(moveDown)
+        gridLayout.add_widget(Button(opacity=0))
+
+        moveUp.bind(on_press=self.clockMoveUp)
+        moveUp.bind(on_release=self.stopClock)
+
+        item3.add_widget(gridLayout)
         self.add_widget(item3)
 
         item4 = AccordionItem(title='Image Settings')
@@ -72,50 +110,166 @@ class accordionWidget(Accordion):
         self.add_widget(item4)
 
         self.microscope  = None
-        self.zooming     = False
-        self.zoom_value  = 0.5
-        self.closing     = False
-        self.zoom_thread = Thread(target=self.adjustZoom)
-        self.zoom_thread.start()
+        # self.zooming     = False
+        # self.zoom_value  = 0.5
+        # self.closing     = False
+        # self.zoom_thread = Thread(target=self.adjustZoom)
+        # self.zoom_thread.start()
 
-        self.focusing     = False
-        self.focus_value  = 0.5
-        self.focus_thread = Thread(target=self.adjustFocus)
-        self.focus_thread.start()
+        # self.focusing     = False
+        # self.focus_value  = 0.5
+        # self.focus_thread = Thread(target=self.adjustFocus)
+        # self.focus_thread.start()
         
 
     def close(self):
-        self.closing = True
+        if self.microscope is not None:
+            self.microscope.focus.cleanup()
 
-    def adjustZoom(self):
-        while not self.closing:
-            if self.microscope is not None and not self.zooming:
-                current = self.microscope.focus.getZoom()
-                if np.abs(current - self.zoom_value) > 0.005 and not self.zooming:
-                    def done():
-                        self.zooming = False
-                    self.zooming = True
-                    self.microscope.focus.setZoom(self.zoom_value, corrected=False, callback=done)
+    # def adjustZoom(self):
+    #     while not self.closing:
+    #         if self.microscope is not None and not self.zooming:
+    #             current = self.microscope.focus.getZoom()
+    #             if np.abs(current - self.zoom_value) > 0.005 and not self.zooming:
+    #                 def done():
+    #                     self.zooming = False
+    #                 self.zooming = True
+    #                 self.microscope.focus.setZoom(self.zoom_value, corrected=False, callback=done)
 
-    def setZoom(self, object, value):
-        self.zoom_value = value
+    def setZoom(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting zoom")
 
-    def adjustFocus(self):
-        while not self.closing:
-            if self.microscope is not None and not self.focusing:
-                current = self.microscope.focus.getFocus()
-                if np.abs(current - self.focus_value) > 0.005 and not self.focusing:
-                    def done():
-                        self.focusing = False
-                    self.focusing = True
-                    self.microscope.focus.setFocus(self.focus_value, corrected=False, callback=done)
+        #print(dir(object))
+        value = object.text
+        print(value)
+        try:
+            value = float(value)
+        except Exception as ex:
+            return
 
-    def setFocus(self, object, value):
-        self.focus_value = value
+
+
+        if value >= 0.005 and value <= 0.995: 
+            print(value)
+            self.microscope.focus.setZoom(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
+
+
+    # def adjustFocus(self):
+    #     while not self.closing:
+    #         if self.microscope is not None and not self.focusing:
+    #             current = self.microscope.focus.getFocus()
+    #             if np.abs(current - self.focus_value) > 0.005 and not self.focusing:
+    #                 def done():
+    #                     self.focusing = False
+    #                 self.focusing = True
+    #                 self.microscope.focus.setFocus(self.focus_value, corrected=False, callback=done)
+
+    def setFocus(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting focus")
+
+        value = object.text 
+        print(value)
+        try:
+            value=float(value)
+        except Exception as ex:
+            return
+
+        if value >= 0.005 and value <= 0.995:
+            self.microscope.focus.setFocus(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
 
     def setMicroscope(self, ms):
         self.microscope = ms
 
+    def incrementZoomMinus(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting focus")
+
+        value = float(self.zoomInput.text)
+        value -= 0.1
+        self.zoomInput.text = "%1.4f"%value
+
+        if value >= 0.005 and value <= 0.995:
+            self.microscope.focus.setZoom(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
+
+    def incrementZoomPlus(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting focus")
+
+        value = float(self.zoomInput.text)
+        value += 0.1
+        self.zoomInput.text = "%1.4f"%value
+
+        if value >= 0.005 and value <= 0.995:
+            self.microscope.focus.setZoom(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
+
+    def incrementFocusMinus(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting focus")
+
+        value = float(self.focusInput.text)
+        value -= 0.1
+        self.focusInput.text = "%1.4f"%value
+
+        if value >= 0.005 and value <= 0.995:
+            self.microscope.focus.setFocus(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
+
+    def incrementFocusPlus(self, object):
+        def done(error, val):
+            if error is None:
+                print(val)
+            else:
+                print("Error setting focus")
+
+        value = float(self.focusInput.text)
+        value += 0.1
+        self.focusInput.text = "%1.4f"%value
+
+        if value >= 0.005 and value <= 0.995:
+            self.microscope.focus.setFocus(value, corrected=False, cb=done)
+        else:
+            print("Invalid input")
+
+    def moveIncrementUp(self,a):
+        def done(error, value):
+            if error is None:
+                print(value)
+            else:
+                print(error)
+
+        self.microscope.stage.moveDelta(0, 0.01, cb=done)
+
+    def clockMoveUp(self,a):
+        Clock.schedule_interval(self.moveIncrementUp,0.01)
+
+    def stopClock(self, a):
+        Clock.unschedule(self.moveIncrementUp)
 
 
 class userInterface(BoxLayout):
@@ -144,7 +298,7 @@ class userInterface(BoxLayout):
                 img = np.rot90(img, 3, axes=(0, 1))
                 img = np.flipud(img)
                 self.image_display.setImage(img)
-        Clock.schedule_interval(checkMicroscope, 1/25)
+        Clock.schedule_interval(checkMicroscope, 1/10)
 
 
         # def _check_process(b):
@@ -165,15 +319,61 @@ class userInterface(BoxLayout):
         self.display.add_widget(self.image_display)
         img = np.random.normal(0.0, 127, (1024, 1024, 3)).astype(np.uint8)
         self.image_display.setImage(img)
+
         self.input1 = BoxLayout(orientation='horizontal',size_hint_y=1)
-        self.input1.add_widget(Label(text='X=',size_hint_x=1))
-        self.input1.add_widget(TextInput(size_hint_x=4))
+
+        xLabel = Label(text='X=',size_hint_x=1)
+        self.xInput = TextInput(multiline=False,size_hint_x=4)
+        yLabel = Label(text='Y=',size_hint_x=1)
+        self.yInput = TextInput(multiline=False,size_hint_x=4)
+
+
+        self.input1.add_widget(xLabel)
+        self.input1.add_widget(self.xInput)
+
         self.input2 = BoxLayout(orientation='horizontal',size_hint_y=1)
-        self.input2.add_widget(Label(text='Y=',size_hint_x=1))
-        self.input2.add_widget(TextInput(size_hint_x=4))
+
+        self.input2.add_widget(yLabel)
+        self.input2.add_widget(self.yInput)
+
         self.add_widget(self.display)
         self.display.add_widget(self.input1)
         self.display.add_widget(self.input2)
+
+        self.yInput.bind(on_text_validate=self.moveTo)
+        self.xInput.bind(on_text_validate=self.moveTo)
+
+    def moveTo(self, object):
+        def done():
+            if error is None:
+                print(val)
+            else:
+                print("Error moving stage")
+
+
+        xvalue = self.xInput.text
+        yvalue = self.yInput.text
+        print(xvalue, yvalue)
+
+        if xvalue.strip() == "" or xvalue is None:
+            xvalue = "0.0"
+
+        if yvalue.strip() == "" or yvalue is None:
+            yvalue = "0.0"
+
+        try:
+            xvalue=float(xvalue)
+            yvalue=float(yvalue)
+        except Exception as ex:
+            return
+
+        print(xvalue, yvalue)
+
+        if xvalue >= -50 and xvalue <= 50:
+            if yvalue >= -44 and yvalue <= 37:
+                self.microscope.stage.moveTo(xvalue, yvalue, callback=done)
+        else:
+            print("Invalid input")
 
 
 
