@@ -9,6 +9,9 @@ import sys
 import time
 import threading
 import code
+import atexit
+
+from queue import SimpleQueue, Empty
 
 # This handles focusing and zooming of the microscope.
 # All calls that perform a long running operation have a keyword
@@ -56,6 +59,34 @@ class FocusController:
 			self.cleanup()
 			raise Exception("Error reading motor limits.") from ex
 
+		self.task_queue  = SimpleQueue()
+		self.task_thread = threading.Thread(target=self._do_tasks)
+		self.exiting     = False
+		self.task_thread.start()
+
+	# This function continuously waits for tasks from the user and
+	# executes them in first-in-first-out order. It guarentees that
+	# tasks will not overlap and will be executed sequentially. 
+	def _do_tasks(self):
+		while not self.exiting:
+			try:
+				fn, args, kwargs, cb = self.task_queue.get(block=True, timeout=0.01)
+			except Empty as ex:
+				# This just means that we couldn't retrieve the task within
+				# the alloted timeout. It should work on the next loop 
+				# iteration.
+				continue
+
+			# If we get to here, there is a task to execute. We will run it
+			# synchronously within this thread.
+			try:
+				result = fn(*args, **kwargs)
+				cb(None, result)
+			except Exception as ex:
+				cb(ex, None)
+
+			time.sleep(0.01)
+
 		
 
 	def __del__(self):
@@ -63,6 +94,7 @@ class FocusController:
 
 	def cleanup(self):
 		try:
+			self.exiting = True
 			if self.connection.is_open:
 				self.connection.close()
 		except:
@@ -133,8 +165,13 @@ class FocusController:
 		self._ignore_response = value
 
 	# Returns zoom_limit, focus_limit
-	def getLimits(self):
-		return self._read_limits()
+	def getLimits(self, cb=None):
+		if cb is None:
+			return self._read_limits()
+		else:
+			self.task_queue.put((
+				self._read_limits, [], {}, cb
+			))
 
 	# Read data from the serial port until a complete response has been
 	# sent. The response is terminated with "$ ", so this function returns
@@ -166,7 +203,15 @@ class FocusController:
 	# squared.
 
 	# Retrieve the acceleration of the zoom motor. 
-	def getZoomAcceleration(self):
+	def getZoomAcceleration(self, cb=None):
+		if cb is None:
+			return self._getZoomAcceleration()
+		else:
+			self.task_queue.put((
+				self._getZoomAcceleration, [], {}, cb
+			))
+
+	def _getZoomAcceleration(self):
 		command_str = b"read setup_accel_1\n"
 		self.connection.write(command_str)
 
@@ -176,7 +221,15 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the initial velocity of the zoom motor.
-	def getZoomInitialVelocity(self):
+	def getZoomInitialVelocity(self, cb=None):
+		if cb is None:
+			return self._getZoomInitialVelocity()
+		else:
+			self.task_queue.put((
+				self._getZoomInitialVelocity, [], {}, cb
+			))
+
+	def _getZoomInitialVelocity(self):
 		command_str = b"read setup_initv_1\n"
 		self.connection.write(command_str)
 
@@ -186,7 +239,15 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the maximum velocity of the zoom motor.
-	def getZoomMaxVelocity(self):
+	def getZoomMaxVelocity(self, cb=None):
+		if cb is None:
+			return self._getZoomMaxVelocity()
+		else:
+			self.task_queue.put((
+				self._getZoomMaxVelocity, [], {}, cb
+			))
+
+	def _getZoomMaxVelocity(self):
 		command_str = b"read setup_maxv_1\n"
 		self.connection.write(command_str)
 
@@ -196,7 +257,15 @@ class FocusController:
 		return int(value[1])
 
 	# Set the acceleration of the zoom motor.
-	def setZoomAcceleration(self, value):
+	def setZoomAcceleration(self, value, cb=None):
+		if cb is None:
+			return self._setZoomAcceleration(value)
+		else:
+			self.task_queue.put((
+				self._setZoomAcceleration, [value], {}, cb
+			))
+
+	def _setZoomAcceleration(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -209,7 +278,16 @@ class FocusController:
 		return int(value[1])
 
 	# Set the initial velocity of the zoom motor.
-	def setZoomInitialVelocity(self, value):
+	def setZoomInitialVelocity(self, value, cb=None):
+		if cb is None:
+			return self._setZoomInitialVelocity(value)
+		else:
+			self.task_queue.put((
+				self._setZoomInitialVelocity, [value], {}, cb
+			))
+		
+
+	def _setZoomInitialVelocity(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -222,7 +300,16 @@ class FocusController:
 		return int(value[1])
 
 	# Set the maximum velocity of the zoom motor.
-	def setZoomMaxVelocity(self, value):
+	def setZoomMaxVelocity(self, value, cb=None):
+		if cb is None:
+			return self._setZoomMaxVelocity(value)
+		else:
+			self.task_queue.put((
+				self._setZoomMaxVelocity, [value], {}, cb
+			))
+		
+
+	def _setZoomMaxVelocity(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -235,7 +322,15 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the acceleration of the focus motor.
-	def getFocusAcceleration(self):
+	def getFocusAcceleration(self, cb=None):
+		if cb is None:
+			return self._getFocusAcceleration()
+		else:
+			self.task_queue.put((
+				self._getFocusAcceleration, [], {}, cb
+			))
+
+	def _getFocusAcceleration(self):
 		command_str = b"read setup_accel_2\n"
 		self.connection.write(command_str)
 
@@ -245,7 +340,15 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the initial velocity of the focus motor.
-	def getFocusInitialVelocity(self):
+	def getFocusInitialVelocity(self, cb=None):
+		if cb is None:
+			return self._getFocusInitialVelocity()
+		else:
+			self.task_queue.put((
+				self._getFocusInitialVelocity, [], {}, cb
+			))
+
+	def _getFocusInitialVelocity(self):
 		command_str = b"read setup_initv_2\n"
 		self.connection.write(command_str)
 
@@ -255,7 +358,16 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the maximum velocity of the focus motor.
-	def getFocusMaxVelocity(self):
+	def getFocusMaxVelocity(self, cb=None):
+		if cb is None:
+			return self._getFocusMaxVelocity()
+		else:
+			self.task_queue.put((
+				self._getFocusMaxVelocity, [], {}, cb
+			))
+
+
+	def _getFocusMaxVelocity(self):
 		command_str = b"read setup_maxv_2\n"
 		self.connection.write(command_str)
 
@@ -265,7 +377,15 @@ class FocusController:
 		return int(value[1])
 
 	# Set the acceleration of the focus motor.
-	def setFocusAcceleration(self, value):
+	def setFocusAcceleration(self, value, cb=None):
+		if cb is None:
+			return self._setFocusAcceleration(value)
+		else:
+			self.task_queue.put((
+				self._setFocusAcceleration, [value], {}, cb
+			))
+
+	def _setFocusAcceleration(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -278,7 +398,15 @@ class FocusController:
 		return int(value[1])
 
 	# Set the initial velocity of the focus motor.
-	def setFocusInitialVelocity(self, value):
+	def setFocusInitialVelocity(self, value, cb=None):
+		if cb is None:
+			return self._setFocusInitialVelocity(value)
+		else:
+			self.task_queue.put((
+				self._setFocusInitialVelocity, [value], {}, cb
+			))
+
+	def _setFocusInitialVelocity(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -291,7 +419,15 @@ class FocusController:
 		return int(value[1])
 
 	# Set the maximum velocity of the focus motor.
-	def setFocusMaxVelocity(self, value):
+	def setFocusMaxVelocity(self, value, cb=None):
+		if cb is None:
+			return self._setFocusMaxVelocity(value)
+		else:
+			self.task_queue.put((
+				self._setFocusMaxVelocity, [value], {}, cb
+			))
+
+	def _setFocusMaxVelocity(self, value):
 		if not isinstance(value, int):
 			raise Exception("This function requires an integer argument.")
 
@@ -304,7 +440,15 @@ class FocusController:
 		return int(value[1])
 
 	# Retrieve the current position of the zoom motor.
-	def getZoom(self):
+	def getZoom(self, cb=None):
+		if cb is None:
+			return self._getZoom()
+		else:
+			self.task_queue.put((
+				self._getZoom, [], {}, cb
+			))
+
+	def _getZoom(self):
 		command_str = b"read current_1\n"
 		self.connection.write(command_str)
 
@@ -316,6 +460,14 @@ class FocusController:
 
 	# Retrieve the current position of the focus motor.
 	def getFocus(self):
+		if cb is None:
+			return self._getFocus()
+		else:
+			self.task_queue.put((
+				self._getFocus, [], {}, cb
+			))
+
+	def _getFocus(self):
 		command_str = b"read current_2\n"
 		self.connection.write(command_str)
 
@@ -326,7 +478,15 @@ class FocusController:
 		return (focus - self.focus_range[0]) / (self.focus_range[1] - self.focus_range[0])
 
 	# Change the current zoom by the specified value.
-	def incrementZoom(self, value, callback=None):
+	def incrementZoom(self, value, cb=None):
+		if cb is None:
+			return self._incrementZoom(value)
+		else:
+			self.task_queue.put((
+				self._incrementZoom, [value], {}, cb
+			))
+
+	def _incrementZoom(self, value):
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
 
@@ -350,22 +510,22 @@ class FocusController:
 		response = self.readResponse()
 		value    = self._parse_response(response, command_str)
 
-
-		if callback is None:
-			self._wait_for_idle('zoom')
-			return int(value[1])
-		else:
-			def complete_operation():
-				self._wait_for_idle('zoom')
-				callback(int(value[1]))
-			wait_thread = threading.Thread(target=complete_operation)
-			wait_thread.start()
-			return None
+		self._wait_for_idle('zoom')
+		return int(value[1])
+		
 		
 		
 
 	# Change the current focus by the specified value.
-	def incrementFocus(self, value, callback=None):
+	def incrementFocus(self, value, cb=None):
+		if cb is None:
+			return self._incrementFocus(value)
+		else:
+			self.task_queue.put((
+				self._incrementFocus, [value], {}, cb
+			))
+
+	def _incrementFocus(self, value):
 		if value < -1.0 or value > 1.0:
 			raise Exception("Values must be in the range [-1.0, 1.0]")
 
@@ -390,48 +550,35 @@ class FocusController:
 		response = self.readResponse()
 		value    = self._parse_response(response, command_str)
 
-		if callback is None:
-			self._wait_for_idle('focus')
-			return int(value[1])
-		else:
-			def complete_operation():
-				self._wait_for_idle('focus')
-				callback(int(value[1]))
-			wait_thread = threading.Thread(target=complete_operation)
-			wait_thread.start()
-			return None
+		self._wait_for_idle('focus')
+		return int(value[1])
+		
 
 	# Set the position of the zoom motor. By default, this will home the
 	# zoom motor to position zero before moving to the requested position. 
 	# This results in better repeatability.
-	def setZoom(self, value, corrected=True, callback=None):
+	def setZoom(self, value, corrected=True, cb=None):
+		if cb is None:
+			return self._setZoom(value, corrected=corrected)
+		else:
+			self.task_queue.put((
+				self._setZoom, [value], {'corrected': corrected}, cb
+			))
+
+	def _setZoom(self, value, corrected=True):
 		if value < 0.0 or value > 1.0:
 			raise Exception("Values must be in the range [0.0, 1.0]")
 
 		if corrected:
 			self._set_zoom(0.0)
-			if callback is None:
-				self._wait_for_idle('zoom')
-				self._set_zoom(value)
-				self._wait_for_idle('zoom')
-			else:
-				def complete_operation():
-					self._wait_for_idle('zoom')
-					self._set_zoom(value)
-					self._wait_for_idle('zoom')
-					callback()
-				wait_thread = threading.Thread(target=complete_operation)
-				wait_thread.start()
+			self._wait_for_idle('zoom')
+			self._set_zoom(value)
+			self._wait_for_idle('zoom')
+			
 		else:
 			self._set_zoom(value)
-			if callback is None:
-				self._wait_for_idle('zoom')
-			else:
-				def complete_operation():
-					self._wait_for_idle('zoom')
-					callback()
-				wait_thread = threading.Thread(target=complete_operation)
-				wait_thread.start()
+			self._wait_for_idle('zoom')
+			
 
 	def _set_zoom(self, value):
 		value  = value * (self.zoom_range[1] - self.zoom_range[0])
@@ -451,34 +598,28 @@ class FocusController:
 	# Set the position of the focus motor. By default, this will home the
 	# focus motor to position zero before moving to the requested position. 
 	# This results in better repeatability.
-	def setFocus(self, value, corrected=True, callback=None):
+	def setFocus(self, value, corrected=True, cb=None):
+		if cb is None:
+			return self._setFocus(value, corrected=corrected)
+		else:
+			self.task_queue.put((
+				self._setFocus, [value], {'corrected': corrected}, cb
+			))
+
+	def _setFocus(self, value, corrected=True):
 		if value < 0.0 or value > 1.0:
 			raise Exception("Values must be in the range [0.0, 1.0]")
 
 		if corrected:
 			self._set_focus(0.0)
-			if callback is None:
-				self._wait_for_idle('focus')
-				self._set_focus(value)
-				self._wait_for_idle('focus')
-			else:
-				def complete_operation():
-					self._wait_for_idle('focus')
-					self._set_focus(value)
-					self._wait_for_idle('focus')
-					callback()
-				wait_thread = threading.Thread(target=complete_operation)
-				wait_thread.start()
+			self._wait_for_idle('focus')
+			self._set_focus(value)
+			self._wait_for_idle('focus')
+			
 		else:
 			self._set_focus(value)
-			if callback is None:
-				self._wait_for_idle('focus')
-			else:
-				def complete_operation():
-					self._wait_for_idle('focus')
-					callback()
-				wait_thread = threading.Thread(target=complete_operation)
-				wait_thread.start()
+			self._wait_for_idle('focus')	
+			
 
 	def _set_focus(self, value):
 		value  = value * (self.focus_range[1] - self.focus_range[0]) 

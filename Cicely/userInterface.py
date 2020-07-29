@@ -1,6 +1,8 @@
-import sys
-# sys.path.append("C:\\Users\\LAB\\AppData\\Roaming\\Python\\share\\glew\\bin")
-# sys.path.append("C:\\Users\\LAB\\AppData\\Roaming\\Python\\share\\sdl2\\bin")
+# Authors:     Cicely Motamedi, Adam Robinson
+# Description: This file contains the main code for the microscope user interface.
+#              Some of the more complicated functionality is found in other files.
+
+
 
 from kivy.app import App
 from kivy.uix.scatter import Scatter
@@ -17,6 +19,7 @@ from kivy.core.window import Window
 from kivy.clock           import Clock
 from threading import Thread
 
+import sys
 sys.path.append("..\\src")
 from MicroscopeControl import MicroscopeController
 from CustomBoxLayout   import CustomBoxLayout
@@ -141,7 +144,7 @@ class userInterface(BoxLayout):
                 img = np.rot90(img, 3, axes=(0, 1))
                 img = np.flipud(img)
                 self.image_display.setImage(img)
-        Clock.schedule_interval(checkMicroscope,1/25)
+        Clock.schedule_interval(checkMicroscope, 1/25)
 
 
         # def _check_process(b):

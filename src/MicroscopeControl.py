@@ -14,6 +14,7 @@ from Progress       import ProgressBar
 
 import time
 import code
+import os
 import cv2
 
 import matplotlib.pyplot as plt
@@ -216,5 +217,8 @@ if __name__ == '__main__':
 		verbose=True,
 		disable_camera=(not camera_on)
 	)
+
+	def exit():
+		os._exit(0)
 
 	code.interact(local=locals())
