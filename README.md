@@ -22,7 +22,7 @@ pip install numpy scipy opencv-python matplotlib pixelinkWrapper pyserial --user
 python -m pip install https://github.com/kivy/kivy/archive/master.zip
 ```
 **Note:**
-Sometimes kivy doesn't automatically install all of its dependencies correctly. If you run into an error when running one of the GUI applications in this repo, run the following.
+Sometimes kivy doesn't automatically install all of its dependencies correctly. If you run into an error when running one of the GUI applications in this repo, run the following. **Use an Admin Prompt**
 
 ```
 python -m pip install docutils pygments pypiwin32 kivy_deps.sdl2==0.1.* kivy_deps.glew==0.1.*
