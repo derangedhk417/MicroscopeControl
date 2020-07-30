@@ -25,6 +25,7 @@ class CameraController:
 		self.pixel_type            = 0      # PT_COLOR
 		self.raw_image_buffer      = create_string_buffer(5000 * 5000 * 2)
 		self.auto_exposure_enabled = False
+		self.current_res           = (2048, 2448, 3)
 
 	# This needs to be called before capturing images from the camera.
 	def startCapture(self):
@@ -46,6 +47,62 @@ class CameraController:
 
 		if not PxLApi.apiSuccess(ret[0]):
 			raise Exception("Failed to end capture state.")
+
+	def enableLowRes(self):
+
+		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.PIXEL_ADDRESSING)
+		if not PxLApi.apiSuccess(ret[0]):
+			print("Unable to read current resolution settings.")
+
+		params = ret[2]
+
+		self.endCapture()
+		params[PxLApi.PixelAddressingParams.MODE]    = PxLApi.PixelAddressingModes.DECIMATE
+		params[PxLApi.PixelAddressingParams.X_VALUE] = 4
+		params[PxLApi.PixelAddressingParams.Y_VALUE] = 4
+
+		ret = PxLApi.setFeature(
+			self.camera_handle, 
+			PxLApi.FeatureId.PIXEL_ADDRESSING, 
+			PxLApi.FeatureFlags.MANUAL, 
+			params
+		)
+
+		if not PxLApi.apiSuccess(ret[0]):
+			print(ret[0])
+			raise Exception("Failed to set resolution.")
+
+		self.current_res = (2048 // 4, 2448 // 4, 3)
+
+		self.startCapture()
+
+	def disableLowRes(self):
+		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.PIXEL_ADDRESSING)
+		if not PxLApi.apiSuccess(ret[0]):
+			print("Unable to read current resolution settings.")
+
+		params = ret[2]
+
+		code.interact(local=locals())
+
+		self.endCapture()
+		params[PxLApi.PixelAddressingParams.MODE]    = PxLApi.PixelAddressingModes.DECIMATE
+		params[PxLApi.PixelAddressingParams.X_VALUE] = 1
+		params[PxLApi.PixelAddressingParams.Y_VALUE] = 1
+
+		ret = PxLApi.setFeature(
+			self.camera_handle, 
+			PxLApi.FeatureId.PIXEL_ADDRESSING, 
+			PxLApi.FeatureFlags.MANUAL, 
+			params
+		)
+
+		if not PxLApi.apiSuccess(ret[0]):
+			raise Exception("Failed to set resolution.")
+
+		self.current_res = (2048, 2448, 3)
+
+		self.startCapture()
 
 	# Turns on automatic exposure adjustment.
 	def enableAutoExposure(self):
@@ -171,7 +228,8 @@ class CameraController:
 
 		imageHeight = int(frameDesc.Roi.fHeight)
 		imageWidth  = int(frameDesc.Roi.fWidth)
-		newShape    = (imageHeight, imageWidth, 3)
+		#newShape    = (imageHeight, imageWidth, 3)
+		newShape    = self.current_res
 
 		np_img = np.reshape(np_img, newShape)
 

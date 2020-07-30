@@ -60,7 +60,8 @@ class ImageManager(ButtonBehavior, CustomBoxLayout):
 
 		# Flag for whether or not an image is currently loaded. 
 		# Zooming events are invalid when this is false.
-		self.is_loaded = False
+		self.is_loaded     = False
+		self.last_img_zoom = None
 
 		# These events will be used to ensure that the image draws in bounds
 		# and has the correct aspect ratio.
@@ -83,6 +84,7 @@ class ImageManager(ButtonBehavior, CustomBoxLayout):
 		self.drag_w                = 0
 		self.drag_h                = 0
 		self.current_zoom_rect_obj = None
+		self.aspect                = None
 
 		# These are, respectively, the current subsection of the image
 		# data array that we are zoomed to and the last coordinates that
@@ -348,7 +350,8 @@ class ImageManager(ButtonBehavior, CustomBoxLayout):
 	# sub array and create a new texture object to display the zoomed image.
 	# This call stacks properly onto previous zoom calls, allowing the user
 	# to make multiple successive zooms.
-	def zoomTo(self, x0, x1, y0, y1):
+	def zoomTo(self, x0, x1, y0, y1, dont_resize=False):
+		self.last_img_zoom = (x0, x1, y0, y1)
 		# First, select the part of the image data that corresponds to the zoom
 		# rectangle.
 		if self.current_zoom_subarray is not None:
@@ -412,6 +415,8 @@ class ImageManager(ButtonBehavior, CustomBoxLayout):
 			size=self.img_size, 
 			colorfmt='bgr'
 		)
+
+		
 		self.image_texture.blit_buffer(
 			self.img_buffer, 
 			colorfmt='bgr', 
@@ -422,37 +427,52 @@ class ImageManager(ButtonBehavior, CustomBoxLayout):
 
 		# Here we force a resize. This will ensure that proper aspect ratio 
 		# is maintained.
-		self._resize(self.size, self.pos)
+		if not dont_resize:
+			self._resize(self.size, self.pos)
 
 	# Undo all zooming operations.
 	def reset(self):
 		if self.is_loaded:
 			self.current_zoom_subarray = None
 			self.last_zoom             = None
+			self.last_img_zoom         = None
 			self.setImage(self.img)
 
 
 	# Takes a numpy/cv2 image and displays it.
 	def setImage(self, img):
 		self.is_loaded  = True
-		self.img_size   = (img.shape[1], img.shape[0])
-		self.aspect     = img.shape[1] / img.shape[0]
 		self.img        = img
-		self.img_buffer = np.fliplr(np.rot90(np.rot90(img)))
-		self.img_buffer = memoryview(self.img_buffer.flatten())
+		if self.last_img_zoom is not None:
+			self.current_zoom_subarray = None
+			self.zoomTo(*self.last_img_zoom)
+		else:
+			self.img_size   = (img.shape[1], img.shape[0])
+			#if self.aspect is None:
+			self.aspect     = img.shape[1] / img.shape[0]
+		
+			self.img_buffer = np.fliplr(np.rot90(np.rot90(img)))
+			self.img_buffer = memoryview(self.img_buffer.flatten())
 
-		self.image_texture = Texture.create(size=self.img_size, colorfmt='bgr')
-		self.image_texture.blit_buffer(
-			self.img_buffer, 
-			colorfmt='bgr', 
-			bufferfmt='ubyte'
-		)
+			self.image_texture = Texture.create(size=self.img_size, colorfmt='bgr')
+			self.image_texture.blit_buffer(
+				self.img_buffer, 
+				colorfmt='bgr', 
+				bufferfmt='ubyte'
+			)
 
-		self.image_rect.texture = self.image_texture
+			self.image_rect.texture = self.image_texture
 
 		# Here we force a resize. This will ensure that the image does not get
 		# cut off at the edges of the layout it is in.
+		# if self.last_img_zoom is not None:
+		# 	self.current_zoom_subarray = None
+		# 	self.zoomTo(*self.last_img_zoom)
+		# else:
+		# 	self._resize(self.size, self.pos)
 		self._resize(self.size, self.pos)
+		
+		
 
 
 # High level class that contains buttons for zooming and reseting the current

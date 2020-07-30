@@ -123,8 +123,7 @@ class accordionWidget(Accordion):
         
 
     def close(self):
-        if self.microscope is not None:
-            self.microscope.focus.cleanup()
+        pass
 
     # def adjustZoom(self):
     #     while not self.closing:
@@ -279,6 +278,8 @@ class userInterface(BoxLayout):
 
     def close(self):
         self.accordion.close()
+        if self.microscope is not None:
+            self.microscope.cleanup()
 
     def __init__(self, **kwargs):
         kwargs['orientation'] = 'horizontal'
@@ -290,15 +291,21 @@ class userInterface(BoxLayout):
 
         Thread(target=self.initializeMicroscope).start()
 
+        self.microscope_loaded = False
+
         def checkMicroscope(a):
-            if self.microscope is not None:
+            if not self.microscope_loaded and self.microscope is not None:
+                self.microscope_loaded = True
+                self.microscope.camera.enableLowRes()
                 self.accordion.setMicroscope(self.microscope)
                 self.microscope.camera.startCapture()
+
+            if self.microscope_loaded:
                 img = self.microscope.camera.getFrame()
                 img = np.rot90(img, 3, axes=(0, 1))
                 img = np.flipud(img)
                 self.image_display.setImage(img)
-        Clock.schedule_interval(checkMicroscope, 1/10)
+        Clock.schedule_interval(checkMicroscope, 1 / 10)
 
 
         # def _check_process(b):
@@ -320,25 +327,25 @@ class userInterface(BoxLayout):
         img = np.random.normal(0.0, 127, (1024, 1024, 3)).astype(np.uint8)
         self.image_display.setImage(img)
 
-        self.input1 = BoxLayout(orientation='horizontal',size_hint_y=1)
+        self.input1 = BoxLayout(orientation='horizontal',size_hint_y=None, height=30)
 
-        xLabel = Label(text='X=',size_hint_x=1)
-        self.xInput = TextInput(multiline=False,size_hint_x=4)
-        yLabel = Label(text='Y=',size_hint_x=1)
-        self.yInput = TextInput(multiline=False,size_hint_x=4)
+        xLabel = Label(text='X=',size_hint_x=1, size_hint_y=None, height=30)
+        self.xInput = TextInput(multiline=False,size_hint_x=4, size_hint_y=None, height=30)
+        yLabel = Label(text='Y=',size_hint_x=1, size_hint_y=None, height=30)
+        self.yInput = TextInput(multiline=False,size_hint_x=4, size_hint_y=None, height=30)
 
 
         self.input1.add_widget(xLabel)
         self.input1.add_widget(self.xInput)
 
-        self.input2 = BoxLayout(orientation='horizontal',size_hint_y=1)
+        #self.input2 = BoxLayout(orientation='horizontal',size_hint_y=1)
 
-        self.input2.add_widget(yLabel)
-        self.input2.add_widget(self.yInput)
+        self.input1.add_widget(yLabel)
+        self.input1.add_widget(self.yInput)
 
         self.add_widget(self.display)
         self.display.add_widget(self.input1)
-        self.display.add_widget(self.input2)
+        #self.display.add_widget(self.input2)
 
         self.yInput.bind(on_text_validate=self.moveTo)
         self.xInput.bind(on_text_validate=self.moveTo)
@@ -381,6 +388,7 @@ class userInterfaceApp(App):
     def on_request_close(self, *args):
         print("close called")
         self.interface.close()
+
         return False
 
     def build(self):

@@ -81,6 +81,10 @@ class MicroscopeController:
 				print("DONE")
 
 
+	def cleanup(self):
+		self.focus.cleanup()
+		self.stage.cleanup()
+
 	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False):
 		if ndiv < 5:
 			raise Exception("You must specify ndiv >= 5.")
