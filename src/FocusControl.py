@@ -60,7 +60,11 @@ class FocusController:
 			raise Exception("Error reading motor limits.") from ex
 
 		self.task_queue  = SimpleQueue()
-		self.task_thread = threading.Thread(target=self._do_tasks)
+		self.task_thread = threading.Thread(
+			target=self._do_tasks,
+			name="Focus Task Thread",
+			daemon=True
+		)
 		self.exiting     = False
 		self.task_thread.start()
 

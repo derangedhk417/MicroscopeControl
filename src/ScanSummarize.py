@@ -191,7 +191,7 @@ if __name__ == '__main__':
 	plt.show()
 
 	# Make a histogram of contrast values.
-	plt.hist(contrast_values, bins=150)
+	plt.hist(contrast_values, bins=300)
 	plt.xlabel("Optical Contrast")
 	plt.ylabel("Count (Pixels)")
 	plt.title("Optical Contrast Distribution")
@@ -215,29 +215,30 @@ if __name__ == '__main__':
 	ax1.set_xlabel("Contrast")
 	ax1.set_ylabel("P(Contrast)")
 	ax1.set_title("Normalized Contrast Distribution (Kernel Density Estimate)")
-
-	# # We'll use a Ricker wavelet to enhance the peaks of the 
-	# # distribution. This should assist us in eliminating noise
-	# # and determining the contrast values that correspond to 
-	# # certain thicknesses.
-
-	def RickerWavelet(n, sigma):
-		return ricker(n, sigma)
-
-
-
-
-	_rng        = contrast_values.max() - contrast_values.min()
-	widths      = np.linspace(
-		max(int(_rng / 20), 1), 
-		int(_rng / 2), 
-		n_points
-	)
-	transformed = cwt(y, RickerWavelet, widths) 
-
-	ax2.imshow(transformed, cmap='Greys')
-	ax2.set_xlabel("Contrast")
-	ax2.set_ylabel("Wavelet Width")
-	ax2.set_title("Continuous Wavelet Transform with Ricker Wavelet")
 	plt.show()
+
+	# # # We'll use a Ricker wavelet to enhance the peaks of the 
+	# # # distribution. This should assist us in eliminating noise
+	# # # and determining the contrast values that correspond to 
+	# # # certain thicknesses.
+
+	# def RickerWavelet(n, sigma):
+	# 	return ricker(n, sigma)
+
+
+
+
+	# _rng        = contrast_values.max() - contrast_values.min()
+	# widths      = np.linspace(
+	# 	max(int(_rng / 20), 1), 
+	# 	int(_rng / 2), 
+	# 	n_points
+	# )
+	# transformed = cwt(y, RickerWavelet, widths) 
+
+	# ax2.imshow(transformed, cmap='Greys')
+	# ax2.set_xlabel("Contrast")
+	# ax2.set_ylabel("Wavelet Width")
+	# ax2.set_title("Continuous Wavelet Transform with Ricker Wavelet")
+	# plt.show()
 

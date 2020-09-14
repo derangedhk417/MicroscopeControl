@@ -8,6 +8,7 @@ import readline
 import cmd
 import sys
 import cv2
+import code
 from threading import Thread
 import time
 
@@ -45,6 +46,9 @@ class MicroscopeShell(cmd.Cmd):
 			img = cv2.resize(img, (0, 0), fx=0.28, fy=0.28)
 			cv2.imshow('Preview', img)
 			cv2.waitKey(1)
+
+		print("Terminating preview thread . . . ")
+		cv2.destroyAllWindows()
 
 	def do_autofocus(self, args):
 		'Set the focus. Prints the current focus if no argument is given.'

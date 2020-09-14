@@ -31,6 +31,15 @@
 			}
 		},
 		{
+			"names" : ["-e", "--exposure"],
+			"spec"  : {
+				"dest"     : "exposure",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The exposure time to use during the scan."
+			}
+		},
+		{
 			"names" : ["-W", "--image-width"],
 			"spec"  : {
 				"dest"     : "image_width",

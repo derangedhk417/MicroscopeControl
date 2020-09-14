@@ -262,53 +262,56 @@ if __name__ == '__main__':
 		# attempt to estimate the total time remaining after 30 seconds.
 		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=120)
 		img_idx = 0
+		microscope.camera.setExposure(args.exposure)
+		try:
+			while x_current < xh:
+				while y_current < yh:
+					# Take an image
+					xc, yc = microscope.stage.getPosition()
+					img    = microscope.camera.getFrame(convert=False)
 
-		while x_current < xh:
-			while y_current < yh:
-				# Take an image
-				xc, yc = microscope.stage.getPosition()
-				img    = microscope.camera.getFrame(convert=False)
+					scanned_locations.append([xc, yc])
 
-				scanned_locations.append([xc, yc])
+					fstr  = '%06d_%2.5f_%2.5f.png'%(
+						n_images, xc, yc
+					)
 
-				fstr  = '%06d_%2.5f_%2.5f.png'%(
-					n_images, xc, yc
-				)
+					n_images += 1
+					img_idx  += 1
+					pb1.update(img_idx)
+					fname = os.path.join(args.output_directory, fstr)
+					meta_data['image_files'].append({
+						'path'     : fstr,
+						'position' : [xc, yc]	
+					})
 
-				n_images += 1
-				img_idx  += 1
-				pb1.update(img_idx)
-				fname = os.path.join(args.output_directory, fstr)
-				meta_data['image_files'].append({
-					'path'     : fstr,
-					'position' : [xc, yc]	
-				})
+					decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
+					cv2.imshow('Scan Preview', decimated)
+					cv2.waitKey(1)
 
-				decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-				cv2.imshow('Scan Preview', decimated)
-				cv2.waitKey(1)
+					cv2.imwrite(fname, img)
 
-				cv2.imwrite(fname, img)
+					if not args.dont_process:
+						# Delegate this to a member of the process pool.
+						stat = process_pool.apply_async(processFile, (img, fname, args))
+						statuses.append(stat)
 
-				if not args.dont_process:
-					# Delegate this to a member of the process pool.
-					stat = process_pool.apply_async(processFile, (img, fname, args))
-					statuses.append(stat)
+					y_current += args.image_height
+					microscope.stage.moveTo(x_current, y_current)
+					microscope.focus.setFocus(
+						interp((x_current, y_current)), 
+						corrected=False
+					)
 
-				y_current += args.image_height
+				y_current = y
+				x_current += args.image_width
 				microscope.stage.moveTo(x_current, y_current)
 				microscope.focus.setFocus(
 					interp((x_current, y_current)), 
-					corrected=False
+					corrected=True
 				)
-
-			y_current = y
-			x_current += args.image_width
-			microscope.stage.moveTo(x_current, y_current)
-			microscope.focus.setFocus(
-				interp((x_current, y_current)), 
-				corrected=True
-			)
+		except KeyboardInterrupt:
+			cv2.destroyAllWindows()
 		pb1.finish()
 
 		n_squares += 1
@@ -343,3 +346,4 @@ if __name__ == '__main__':
 		file.write(json.dumps(meta_data))
 
 	microscope.camera.endCapture()
+	cv2.destroyAllWindows()

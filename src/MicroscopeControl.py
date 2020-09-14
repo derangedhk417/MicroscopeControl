@@ -80,6 +80,8 @@ class MicroscopeController:
 			if self.verbose:
 				print("DONE")
 
+	def __del__(self):
+		self.cleanup()
 
 	def cleanup(self):
 		self.focus.cleanup()

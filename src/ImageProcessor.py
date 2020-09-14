@@ -254,7 +254,8 @@ class FlakeExtractor:
 			downscale=kwargs['downscale']
 		)
 		self.threshold      = kwargs['threshold']
-		self.contrast_floor = kwargs['contrast_floor'] 
+		self.contrast_floor = kwargs['contrast_floor']
+		self.downscale      = kwargs['downscale']
 
 	def process(self, DEBUG_DISPLAY=False):
 		if DEBUG_DISPLAY:
@@ -342,16 +343,27 @@ class FlakeExtractor:
 
 		bg_removed = cv2.cvtColor(bg_subtracted, cv2.COLOR_RGB2GRAY)
 		if DEBUG_DISPLAY:
+			debug_show(rbg_image, sys._getframe().f_lineno)
+			debug_show(bg_subtracted, sys._getframe().f_lineno)
 			debug_show(bg_removed, sys._getframe().f_lineno)
 		bg_removed[bg_removed < self.contrast_floor] = 0
+
+		#code.interact(local=locals())
+
+		# Before we reprocess the flake boundaries, we will take everything outside
+		# of the contours calculated in the first step and set it to zero.
+		larger_mask = cv2.resize(mask, (2448, 2048))
+		bg_removed[larger_mask == 0] = 0
 
 		# Now we reprocess flake boundaries.
 		proc = ImageProcessor(bg_removed, downscale=1, mode='GS')
 		if not DEBUG_DISPLAY:
-			tmp  = proc.noStore().level().erode(7)
+			#tmp  = proc.noStore().level().erode(2)
+			tmp  = proc.noStore().level().erode(2)
 			res  = tmp.border(5, 0).edge(0, 1).dilate(2).done()
 		else:
-			tmp  = proc.level().erode(7)
+			#tmp  = proc.level().erode(2)
+			tmp  = proc.level().erode(2)
 			res  = tmp.border(5, 0).edge(0, 1).dilate(2).display().done()[-1]
 
 		if DEBUG_DISPLAY:
@@ -444,6 +456,8 @@ class FlakeExtractor:
 			con  = con.astype(np.int32)
 			contrast_mask = cv2.fillPoly(contrast_mask, [con], 1)
 
+		
+
 
 		rgb      = bg_downscaled[contrast_mask == 1]
 		b_values = rgb[:, 0]
@@ -453,12 +467,41 @@ class FlakeExtractor:
 		results['g_values'] = g_values.tolist()
 		results['b_values'] = b_values.tolist()
 
+		# Create a mask for each individual flake and extract contrast value
+		# statistics from each flake. 
+
 		contrast_img = bg_downscaled / (bg_color + original_downscaled)
+
+		contrast = contrast_img[contrast_mask == 1].sum(axis=1)
+		results['contrast_values'] = contrast.tolist()
+
+		contrast_means = []
+		contrast_stds  = []
+
+		for contour in results['contours']:
+			contrast_mask = np.zeros((
+				bg_downscaled.shape[0], 
+				bg_downscaled.shape[1]
+			)).astype(np.uint8)
+
+			con  = np.array(contour)
+			con[:, 0] *= bg_downscaled.shape[1]
+			con[:, 1] *= bg_downscaled.shape[0]
+			con  = con.astype(np.int32)
+			contrast_mask = cv2.fillPoly(contrast_mask, [con], 1)
+
+			# Extract the contrast values.
+			contrast_vals  = contrast_img[contrast_mask == 1].sum(axis=1)
+			contrast_means.append(contrast_vals.mean())
+			contrast_stds.append(contrast_vals.std())
+
+		results['contrast_means'] = contrast_means
+		results['contrast_stds']  = contrast_stds
+
+		
 		if DEBUG_DISPLAY:
 			debug_show(contrast_img.sum(axis=2), sys._getframe().f_lineno)
 
-		contrast     = contrast_img[contrast_mask == 1].sum(axis=1)
-		results['contrast_values'] = contrast.tolist()
 
 		if DEBUG_DISPLAY:
 			# Overlay the contours on the original image.

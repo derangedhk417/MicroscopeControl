@@ -40,7 +40,11 @@ class StageController:
 			raise Exception("Error setting stage limits.") from ex
 
 		self.task_queue  = SimpleQueue()
-		self.task_thread = threading.Thread(target=self._do_tasks)
+		self.task_thread = threading.Thread(
+			target=self._do_tasks,
+			name="Stage Task Thread",
+			daemon=True
+		)
 		self.exiting     = False
 		self.task_thread.start()
 
