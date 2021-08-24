@@ -1,0 +1,23 @@
+{
+	"description" : "TODO: Write this.",
+	"arguments"   : [
+		{
+			"names" : ["-p", "--data-path"],
+			"spec"  : {
+				"dest"     : "data_path",
+				"type"     : "str",
+				"default"  : "",
+				"help"     : "The directory containing the images to process."
+			}
+		},
+		{
+			"names" : ["-c", "--contrast-data"],
+			"spec"  : {
+				"dest"     : "contrast_data",
+				"type"     : "str",
+				"default"  : "",
+				"help"     : "If specified, calculate the contrast of the given image and display it next to a histogram of contrast values."
+			}
+		}
+	]
+}

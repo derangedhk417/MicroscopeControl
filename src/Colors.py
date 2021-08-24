@@ -11,3 +11,6 @@ dist_colors = [
 	"#5EF1F2", "#00998F", "#E0FF66",
 	"#740AFF", "#990000", "#FF5005"
 ]
+
+def torgb(h):
+	return [int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)]
