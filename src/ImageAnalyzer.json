@@ -11,6 +11,15 @@
 			}
 		},
 		{
+			"names" : ["-d", "--dir"],
+			"spec"  : {
+				"dest"     : "image_dir",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "Path to the image directory."
+			}
+		},
+		{
 			"names" : ["-rt", "--rejection-threshold"],
 			"spec"  : {
 				"dest"     : "rejection_threshold",

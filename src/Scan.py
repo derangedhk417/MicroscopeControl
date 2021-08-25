@@ -125,7 +125,7 @@ def calibrate_square(xrng, yrng, microscope):
 	print("The focal points have been fit to a function of the form z = ax + by + c.")
 	print("RMSE of fit: %f"%rmse)
 
-	if rmse > 0.002:
+	if rmse > 0.006:
 		print("Fit too poor to continue.")
 		print("Please ensure that the corners of the ", end='')
 		print("scan region contain something to focus on.")

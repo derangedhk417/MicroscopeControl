@@ -23,7 +23,7 @@ class MicroscopeShell(cmd.Cmd):
 
 		super(MicroscopeShell, self).__init__(*args, **kwargs)
 
-		self.microscope =  MicroscopeController(
+		self.microscope = MicroscopeController(
 			verbose=True,
 			disable_camera=self.no_camera
 		)

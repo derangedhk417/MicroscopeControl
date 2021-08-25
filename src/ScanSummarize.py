@@ -203,20 +203,7 @@ if __name__ == '__main__':
 		min(200000, len(contrast_values)), 
 		replace=False
 	)
-	kde = gaussian_kde(contrast_values, bw_method='silverman')
-
-	n_points = 512
-	xrng = np.linspace(contrast_values.min(), contrast_values.max(), n_points)
-	y    = kde(xrng)
-
-	fig, (ax1, ax2) = plt.subplots(1, 2)
-
-	ax1.plot(xrng, y)
-	ax1.set_xlabel("Contrast")
-	ax1.set_ylabel("P(Contrast)")
-	ax1.set_title("Normalized Contrast Distribution (Kernel Density Estimate)")
-	plt.show()
-
+	
 	# # # We'll use a Ricker wavelet to enhance the peaks of the 
 	# # # distribution. This should assist us in eliminating noise
 	# # # and determining the contrast values that correspond to 

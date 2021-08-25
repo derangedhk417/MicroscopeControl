@@ -46,9 +46,9 @@ class MicroscopeController:
 			self.focus = FocusController(fp, fb)
 		else:
 			self.focus = getFocusController()
-			if self.focus is None:
-				print("FAIL")
-				raise Exception("Failed to connect to focus controller.")
+		if self.focus is None:
+			print("FAIL")
+			raise Exception("Failed to connect to focus controller.")
 
 		if self.verbose:
 			print("DONE")
@@ -61,9 +61,9 @@ class MicroscopeController:
 			self.stage = StageController(sp, sb)
 		else:
 			self.stage = getStageController()
-			if self.stage is None:
-				print("FAIL")
-				raise Exception("Failed to connect to stage controller.")
+		if self.stage is None:
+			print("FAIL")
+			raise Exception("Failed to connect to stage controller.")
 
 		if self.verbose:
 			print("DONE")

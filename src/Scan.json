@@ -36,7 +36,7 @@
 				"dest"     : "exposure",
 				"type"     : "float",
 				"required" : true,
-				"help"     : "The exposure time to use during the scan."
+				"help"     : "The exposure time to use during the scan in seconds."
 			}
 		},
 		{

@@ -25,13 +25,8 @@ class FocusController:
 	# will wait for data when reading. If this value is too high, function
 	# calls will take a long time to return because the class will spend so
 	# much time waiting for more data on the serial port.
-	#
-	# retries: The number of times to retry an operation if it fails. 
-	#          Unfortunately, the controller seems to fail randomly,
-	#          which makes this kind of thing necessary.
-	def __init__(self, port="COM4", baud=38400, timeout=0, retries=4):
+	def __init__(self, port="COM4", baud=38400, timeout=0):
 		self.connection = serial.Serial(port, baud, timeout=timeout)
-		self.retries    = retries
 
 		if not self.connection.is_open:
 			raise Exception("Failed to open serial connection.")
@@ -663,7 +658,7 @@ class FocusController:
 # if it succeeds and None otherwise.
 def autoConnect():
 	# Build a list of ports to try.
-	ports = ["COM4", "COM1", "COM2", "COM3", "COM0"]
+	ports = ["COM4", "COM3", "COM2", "COM1", "COM0"]
 
 	for i in range(5, 10):
 		ports.append("COM%d"%i)
