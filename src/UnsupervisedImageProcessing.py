@@ -277,7 +277,8 @@ class ModelTrainer:
 
 
 def getImgContrast(img, threshold=0.05):
-	img = cv2.bilateralFilter(img, 5, 20, 80)
+	img = cv2.medianBlur(img, 3)
+	#img = cv2.bilateralFilter(img, 5, 20, 80)
 	# img = cv2.fastNlMeansDenoisingColored(
 	# 	img, 
 	# 	30, 
@@ -298,9 +299,9 @@ def getImgContrast(img, threshold=0.05):
 	G = G.astype(np.float32)
 	B = B.astype(np.float32)
 
-	R_con = -(R - R_mode) / R_mode
-	G_con = -(G - G_mode) / G_mode
-	B_con = -(B - B_mode) / B_mode
+	R_con = (R - R_mode) / R_mode
+	G_con = (G - G_mode) / G_mode
+	B_con = (B - B_mode) / B_mode
 
 	# Set everything less than the threshold value to zero.
 	R_con[R_con < threshold] = 0
@@ -369,7 +370,7 @@ class MultiGaussianModel:
 			self.normalizations.append(a * np.sqrt(c * np.pi))
 
 	def score(self, samples):
-		fn = self.getNormalizedFunction()
+		self.normalize()
 		# Now we evaluate each gaussian (normalized) for the x value "sample"
 		# provided. We take this as the "score".
 		scores = []
@@ -378,8 +379,24 @@ class MultiGaussianModel:
 			a = self.params[n * 3]
 			b = self.params[n * 3 + 1]
 			c = self.params[n * 3 + 2]
-			score = (a / A) * np.exp(-np.square(x - b) / c)
-			scores.append()
+			score = (a / A) * np.exp(-np.square(samples - b) / c)
+			scores.append(score)
+
+		# We should now have an array where each element in the first
+		# dimension corresponds to a gaussian and each second dimension
+		# corresponds to a sample.
+		scores = np.array(scores).T
+
+		# scores is now formatted like:
+		# [sample_1_g1_score, sample_1_g2_score ...]
+		# .
+		# .
+		# .
+		# [sample_n_g1_score, sample_n_g2_score ...]
+
+		# Now we determine the classification by taking the index of the gaussian
+		# for which the score is the highest across each row.
+		return np.argmax(scores, axis=1)
 		
 
 	def getInitialFunction(self):
@@ -417,10 +434,21 @@ class MultiGaussianModel:
 
 		return fn
 
+	def plotIndividualGaussian(self, x, n):
+		a = self.params[n * 3]
+		b = self.params[n * 3 + 1]
+		c = self.params[n * 3 + 2]
+		result = a * np.exp(-np.square(x - b) / c)
+		return result
+
 	def getRMSE(self):
 		fn   = self.getFinalFunction()
 		rmse = np.sqrt(np.square(fn(self.x) - self.y).mean())
-		return rmse
+		return rmse.item()
+
+	def getResidual(self):
+		fn   = self.getFinalFunction()
+		return fn(self.x) - self.y
 
 
 
@@ -438,7 +466,7 @@ if __name__ == '__main__':
 		plt.imshow(img)
 		plt.show()
 
-		contrast_img = getImgContrast(img)
+		contrast_img = getImgContrast(img, threshold=0.07)
 
 		data = contrast_img.reshape(
 			contrast_img.shape[0] * contrast_img.shape[1],
@@ -458,10 +486,10 @@ if __name__ == '__main__':
 
 		g_kde = gaussian_kde(g_data)
 
-		x = np.linspace(g_data.min(), g_data.max(), 128)
+		x = np.linspace(g_data.min(), g_data.max(), 256)
 		y = g_kde(x)
 
-		peaks, props = find_peaks(y, height=[0, 1000])
+		peaks, props = find_peaks(y, height=[0.02, 1000])
 
 		#code.interact(local=locals())
 
@@ -469,6 +497,10 @@ if __name__ == '__main__':
 		fig, (ax1, ax2) = plt.subplots(1, 2)
 		ax1.imshow(contrast_img[:, :, 1])
 		ax2.plot(x, y)
+
+		print("%d peaks"%(len(peaks)))
+		print(x[peaks])
+		print(props['peak_heights'])
 
 		ax2.scatter(
 			x[peaks], 
@@ -489,6 +521,12 @@ if __name__ == '__main__':
 		ax1.set_title("Contrast (Green Channel)")
 		plt.show()
 
+		halo_img = contrast_img[:, :, 1].copy()
+		halo_img[halo_img > 1.6] = 0.0
+		plt.imshow(halo_img)
+		plt.title("Halo Image")
+		plt.show()
+
 		# print(len(peaks))
 		# print(x[peaks])
 		# print(props['peak_heights'])
@@ -498,26 +536,71 @@ if __name__ == '__main__':
 		# fit any broad background.
 		centers = x[peaks]
 		heights = props['peak_heights']
-		# centers = list(x[peaks])
-		# heights = list(props['peak_heights'])
+		centers = list(x[peaks])
+		heights = list(props['peak_heights'])
 		# centers.append((x[-1] - x[0]) / 2)
 		# heights.append(0.5)
 		# centers = np.array(centers)
 		# heights = np.array(heights)
 
-		model = MultiGaussianModel(len(peaks), centers, heights)
-		model.fit(x, y)
+		rmse     = 10.0
+		attempts = 0
+		max_rmse = 0.03
 
-		print("RMSE: " + str(model.getRMSE()))
+		while rmse > max_rmse and attempts < 5:
+			model = MultiGaussianModel(
+				len(centers), 
+				np.array(centers), 
+				np.array(heights)
+			)
+			model.fit(x, y)
+			rmse = model.getRMSE()
+			print("RMSE: " + str(rmse))
 
-		fn = model.getFinalFunction()
+			if rmse > max_rmse:
+				# calculate the residual and find any peaks in it.
+				res = model.getResidual()
+				peaks, props = find_peaks(res, height=[0.005, 1000])
+				if len(peaks) < 1:
+					break
+				# Add only the highest peak in the residual to the list.
+				highest_arg = np.argmax(props['peak_heights'])
+				centers.append(x[highest_arg])
+				heights.append(props['peak_heights'][highest_arg])
+				# for i, p in enumerate(peaks):
+				# 	centers.append(x[p])
+				# 	heights.append(props['peak_heights'][i])
+
+			attempts += 1
+
+		print("Final Characteristics")
+		print("    %d peaks"%(len(model.centers)))
+		print("    centers: %s"%str(model.centers))
+		print("    heights: %s"%str(model.heights))
+
+		fn  = model.getFinalFunction()
 		ifn = model.getInitialFunction()
 
-		s1, = plt.plot(x, y)
+		s1, = plt.plot(x, y, linewidth=3)
 		s2, = plt.plot(x, fn(x), linestyle='dashed')
 		s3, = plt.plot(x, ifn(x), linestyle='dashed', alpha=0.3)
+
+		for n in range(len(model.centers)):
+			plt.plot(x, model.plotIndividualGaussian(x, n), alpha=0.4)
 		plt.legend([s1, s2, s3], ['Data', 'Fit', 'Initial'])
 		plt.show()
+
+		width, height = contrast_img.shape[0], contrast_img.shape[1]
+		samples = contrast_img[:, :, 1].copy().reshape(width * height)
+		scores = model.score(samples)
+
+		fig, (ax1, ax2) = plt.subplots(2, 1)
+		colored_img = scores.reshape(width, height)
+		colored_img[contrast_img[:, :, 1] == 0] = -1.0
+		ax1.imshow(contrast_img[:, :, 1])
+		ax2.imshow(colored_img)
+		plt.show()
+
 		
 	else:
 		m = Model()

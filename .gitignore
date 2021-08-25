@@ -132,3 +132,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+src/Image-5.bmp
+src/Image-6.bmp
+src/Image-7.bmp
