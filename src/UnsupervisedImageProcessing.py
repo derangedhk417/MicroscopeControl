@@ -34,6 +34,7 @@ from Colors          import torgb
 from scipy.stats     import gaussian_kde
 from scipy.signal    import find_peaks
 from scipy.optimize  import curve_fit, least_squares
+from copy            import deepcopy
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):
@@ -299,9 +300,9 @@ def getImgContrast(img, threshold=0.05):
 	G = G.astype(np.float32)
 	B = B.astype(np.float32)
 
-	R_con = (R - R_mode) / R_mode
-	G_con = (G - G_mode) / G_mode
-	B_con = (B - B_mode) / B_mode
+	R_con = -(R - R_mode) / R_mode
+	G_con = -(G - G_mode) / G_mode
+	B_con = -(B - B_mode) / B_mode
 
 	# Set everything less than the threshold value to zero.
 	R_con[R_con < threshold] = 0
@@ -466,7 +467,7 @@ if __name__ == '__main__':
 		plt.imshow(img)
 		plt.show()
 
-		contrast_img = getImgContrast(img, threshold=0.07)
+		contrast_img = getImgContrast(img, threshold=0.03)
 
 		data = contrast_img.reshape(
 			contrast_img.shape[0] * contrast_img.shape[1],
@@ -543,9 +544,12 @@ if __name__ == '__main__':
 		# centers = np.array(centers)
 		# heights = np.array(heights)
 
-		rmse     = 10.0
-		attempts = 0
-		max_rmse = 0.03
+		rmse       = 10.0
+		attempts   = 0
+		max_rmse   = 0.03
+		last_rmse  = 10
+		rmse_step  = 1.5  # If the rmse isn't at least 50% better, stop
+		last_model = None
 
 		while rmse > max_rmse and attempts < 5:
 			model = MultiGaussianModel(
@@ -557,6 +561,12 @@ if __name__ == '__main__':
 			rmse = model.getRMSE()
 			print("RMSE: " + str(rmse))
 
+			if (last_rmse - rmse) / rmse < rmse_step:
+				print("Additional gaussian did not improve error significantly")
+				print("Stopping optimization")
+				model = last_model
+				break
+
 			if rmse > max_rmse:
 				# calculate the residual and find any peaks in it.
 				res = model.getResidual()
@@ -567,6 +577,9 @@ if __name__ == '__main__':
 				highest_arg = np.argmax(props['peak_heights'])
 				centers.append(x[highest_arg])
 				heights.append(props['peak_heights'][highest_arg])
+
+				last_model = deepcopy(model)
+				last_rmse  = rmse
 				# for i, p in enumerate(peaks):
 				# 	centers.append(x[p])
 				# 	heights.append(props['peak_heights'][i])
