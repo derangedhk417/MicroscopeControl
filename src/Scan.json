@@ -87,15 +87,6 @@
 			}
 		},
 		{
-			"names" : ["-cf", "--contrast-floor"],
-			"spec"  : {
-				"dest"     : "contrast_floor",
-				"type"     : "int",
-				"default"  : 40,
-				"help"     : "Once a background subtracted image has been constructed, any pixel with a luminescence value less than this will be floored to zero."
-			}
-		},
-		{
 			"names" : ["-ds", "--downscale"],
 			"spec"  : {
 				"dest"     : "downscale",
@@ -120,6 +111,14 @@
 				"dest"     : "dont_process",
 				"action"   : "store_true",
 				"help"     : "Only save images to the disk, don't process them. This is useful if you are unsure of what noise floor or rejection threshold to use."
+			}
+		},
+		{
+			"names" : ["-ic", "--invert-contrast"],
+			"spec"  : {
+				"dest"     : "invert_contrast",
+				"action"   : "store_true",
+				"help"     : "Invert the calculated contrast values before processing. (flip the sign)"
 			}
 		}
 	]

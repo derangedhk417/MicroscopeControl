@@ -1,4 +1,5 @@
 {
+	"material"  : "HOPG on 90 nm SiO2",
 	"threshold" : {
 		"comment" : "Any pixel with a contrast value under this value will be set to zero and assumed to contain no relevant data.",
 		"r" : 0.04993664667,
