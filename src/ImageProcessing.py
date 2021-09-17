@@ -86,6 +86,17 @@ class ImageProcessor:
 		else:
 			self.debug = False
 
+		# height, width (mm)
+		if 'image_dims' in kwargs:
+			self.image_dims = kwargs['image_dims']
+		else:
+			self.image_dims = None
+
+		if 'min_area' in kwargs:
+			self.min_area = kwargs['min_area']
+		else:
+			self.min_area = 0.0
+
 	# This will create a gaussian centered on each thickness value for each color channel. The 
 	# gaussian will be normalized and it's FWHM will be half the distance between itself and the
 	# next closest contrast value.
@@ -246,18 +257,9 @@ class ImageProcessor:
 		# For example, if a pixels value is 2, that would correspond to 3 layers, if the 
 		# supplied data files has data for layers 1-20 in order.
 
-		layers, disagreement, [scores_r, scores_g, scores_b] = self.categorizeContrastImage(
-			contrast_img, calc_disagreement=True
+		layers, _, [scores_r, scores_g, scores_b] = self.categorizeContrastImage(
+			contrast_img, calc_disagreement=False
 		)
-
-		if self.debug:
-			disag_img = layers.copy()
-			disag_img[:, :] = 0
-			disag_img[disagreement] = 1
-			fig, (ax1, ax2) = plt.subplots(1, 2)
-			ax1.imshow(layers)
-			ax2.imshow(disag_img)
-			plt.show()
 
 		# Now that we have the layer data, we use it to create a mask where 1 corresponds to flake
 		# and 0 corresponds to background. We'll use this to contour each flake. This information
@@ -266,21 +268,60 @@ class ImageProcessor:
 
 		contours, rectangles = self.getFlakeContours(layers)
 
+		# The ultimate product of this function should be a database entry for each flake found in
+		# the image. We want to have the following columns for each flake:
+		#     area, L1_area, L2_area, ..., LN_area
+		# where there is a column for each layer number in the configuration file passed to this
+		# function.
+
+		# We need a conversion factor between square pixels and square real units.
+		# If we weren't supplied with image area information then we just set this to 1.
+		conversion_factor = 1.0
+		if self.image_dims is not None:
+			h, w = self.image_dims
+			h *= 1e-3 # convert to meters
+			w *= 1e-3 # convert to meters
+
+			width_per_pixel   = w / self.current_img.shape[1]
+			height_per_pixel  = h / self.current_img.shape[0]
+			# Pixels should be square so we take the average of the two values.
+			# This should result in each area being in square microns.
+			conversion_factor = width_per_pixel * height_per_pixel * 1e12
+
+		entries = []
+		for idx, (c0, r0) in enumerate(zip(contours, rectangles)):
+			# We want to extract a subimage that corresponds to the flake we are dealing with. We'll
+			# extract this subimage from the "layers" image and use it to calculate stats for the
+			# flake.
+			entry             = {}
+			entry['file']     = os.path.split(self.img_path)[-1]
+			entry['geom_idx'] = idx
+
+			flake_image   = self.subimage(layers, r0)
+			area          = (flake_image.flatten() != 0).sum() * conversion_factor
+			if area < self.min_area:
+				continue
+			entry['area'] = area
+
+			# Now we repeat the calculation, but for every layer number.
+			counts = np.bincount(flake_image.astype(np.int64).flatten())[1:]
+			if len(counts) == 0:
+				continue
+			for i, count in enumerate(counts):
+				entry['L%03d_area'%(i + 1)] = count * conversion_factor
+
+			entries.append(entry)
+			# TODO: Calculate quality statistics like the continuity of regions. Number of holes,
+			# concavity, etc.
+
+
 		# We now have pretty much all of the useful raw data we can get from the image. The next
 		# step is to export this data into a format that can be processed.
 		fname = self.img_path.replace("\\", "/").split("/")[-1]
 		geometry_path = os.path.join(self.output_path, "%s.geometry.json"%fname)
 		layers_path   = os.path.join(self.output_path, "%s.layers.npy"%fname)
-		scores_path   = os.path.join(self.output_path, "%s.scores.npy"%fname)
+		stats_path    = os.path.join(self.output_path, "%s.stats.json"%fname)
 
-		scores = np.stack([
-			scores_r, 
-			scores_g,
-			scores_b,
-		], axis=2)
-
-		# This appears to take way too much disk space.
-		# np.save(scores_path, scores)
 		np.save(layers_path, layers)
 		with open(geometry_path, 'w') as file:
 			file.write(json.dumps({
@@ -288,6 +329,40 @@ class ImageProcessor:
 				'rectangles' : rectangles
 			}))
 
+		with open(stats_path, 'w') as file:
+			file.write(json.dumps({"flakes": entries}))
+
+	def subimage(self, image, rect):
+		border_size = int(image.shape[0] / 2)
+		image = cv2.copyMakeBorder(
+			image,
+			border_size,
+			border_size,
+			border_size,
+			border_size,
+			cv2.BORDER_CONSTANT,
+			value=[0, 0, 0]
+		)
+
+		((x, y), (w, h), theta) = rect
+
+		x = x + border_size
+		y = y + border_size
+
+		size = (image.shape[1], image.shape[0])
+
+		rotation_matrix = cv2.getRotationMatrix2D(center=(x, y), angle=theta, scale=1)
+		new_image       = cv2.warpAffine(image, rotation_matrix, dsize=size)
+
+		x = int(x - w/2)
+		y = int(y - h/2)
+
+		w = int(w)
+		h = int(h)
+
+		result = new_image[y:y+h, x:x+w]
+		#code.interact(local=locals())
+		return result
 
 	def getFlakeContours(self, layers):
 		# In order to make the image ready for processing, we need to level it (make it binary),
@@ -336,6 +411,7 @@ class ImageProcessor:
 		contours, heirarchy = cv2.findContours(
 			dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
 		)
+
 		contours   = [c.reshape(-1, 2) for c in contours]
 		rectangles = [cv2.minAreaRect(c.reshape(-1, 1, 2)) for c in contours]
 
@@ -448,8 +524,6 @@ class ImageProcessor:
 		if calc_disagreement:
 			disagreement = (cat_r != cat_g) | (cat_g != cat_b) | (cat_b != cat_r)
 
-
-
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
 def processFile(img, fname, args):
@@ -461,11 +535,11 @@ def processFile(img, fname, args):
 		denoise=0,
 		erode=3,
 		dilate=3,
-		downscale_factor=args.downscale
+		downscale_factor=args.downscale,
 		debug=False,
-		output_path=args.output_directory
+		output_path=args.output_directory,
+		image_dims=[args.image_height, args.image_width]
 	)
-
 	p.processImage(fname)
 	return True, None
 
@@ -491,13 +565,15 @@ if __name__ == '__main__':
 
 	# KEEP THIS, IT SEEMS TO WORK WELL
 	p = ImageProcessor(
-		"_graphene.json", 
-		invert_contrast=False,
+		"_graphene_on_pdms.json", 
+		invert_contrast=True,
 		median_blur=False,
 		sharpen=True,
 		denoise=0,
 		erode=3,
 		dilate=3,
-		debug=False
+		debug=True,
+		downscale_factor=4,
+		output_path="pdms_001_graphene_scan_003"
 	)
-	p.processImage("test/Image2.png")
+	p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")

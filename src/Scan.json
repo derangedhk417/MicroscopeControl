@@ -11,6 +11,15 @@
 			}
 		},
 		{
+			"names" : ["-mat", "--material-file"],
+			"spec"  : {
+				"dest"     : "material_file",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The material file to use. Should contain information about the stack of materials present."
+			}
+		},
+		{
 			"names" : ["-x", "--x-limits"],
 			"spec"  : {
 				"dest"     : "x_limits",

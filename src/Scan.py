@@ -33,8 +33,7 @@ from scipy.optimize     import curve_fit
 from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
 from multiprocessing    import Pool
-from ImageProcessor     import ImageProcessor
-from ScanProcessing     import processFile
+from ImageProcessing    import processFile
 from datetime           import datetime
 
 # Process the command line arguments supplied to the program.
