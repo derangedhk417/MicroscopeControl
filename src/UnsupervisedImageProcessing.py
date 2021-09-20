@@ -449,7 +449,7 @@ class MultiGaussianModel:
 
 	def getResidual(self):
 		fn   = self.getFinalFunction()
-		return fn(self.x) - self.y
+		return self.y - fn(self.x) 
 
 
 
@@ -467,7 +467,7 @@ if __name__ == '__main__':
 		plt.imshow(img)
 		plt.show()
 
-		contrast_img = getImgContrast(img, threshold=0.03)
+		contrast_img = getImgContrast(img, threshold=0.1)
 
 		data = contrast_img.reshape(
 			contrast_img.shape[0] * contrast_img.shape[1],
@@ -548,7 +548,7 @@ if __name__ == '__main__':
 		attempts   = 0
 		max_rmse   = 0.03
 		last_rmse  = 10
-		rmse_step  = 1.5  # If the rmse isn't at least 50% better, stop
+		rmse_step  = 0.05  # If the rmse isn't at least 50% better, stop
 		last_model = None
 
 		while rmse > max_rmse and attempts < 5:
