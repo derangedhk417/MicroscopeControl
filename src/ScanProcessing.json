@@ -4,7 +4,7 @@
 		{
 			"names" : ["-d", "--image-directory"],
 			"spec"  : {
-				"dest"     : "image_directory",
+				"dest"     : "output_directory",
 				"type"     : "str",
 				"required" : true,
 				"help"     : "The directory containing the images to process."
@@ -20,16 +20,6 @@
 			}
 		},
 		{
-			"names" : ["-rt", "--rejection-threshold"],
-			"spec"  : {
-				"dest"     : "rejection_threshold",
-				"type"     : "float",
-				"default"  : 0.01,
-				"required" : false,
-				"help"     : "Any flake with the largest dimension of its bounding box less than this will be treated as a non-flake. Images containing no flakes will be deleted."
-			}
-		},
-		{
 			"names" : ["-ds", "--downscale"],
 			"spec"  : {
 				"dest"     : "downscale",
@@ -39,20 +29,46 @@
 			}
 		},
 		{
-			"names" : ["-cf", "--contrast-floor"],
-			"spec"  : {
-				"dest"     : "contrast_floor",
-				"type"     : "int",
-				"default"  : 40,
-				"help"     : "Once a background subtracted image has been constructed, any pixel with a luminescence value less than this will be floored to zero."
-			}
-		},
-		{
 			"names" : ["-dd", "--debug-display"],
 			"spec"  : {
 				"dest"     : "debug_display",
 				"action"   : "store_true",
 				"help"     : "Display each image at every step in the flake extraction process with line numbers. This is useful for calibrating values like the noise floor and the rejection threshold."
+			}
+		},
+		{
+			"names" : ["-mat", "--material-file"],
+			"spec"  : {
+				"dest"     : "material_file",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The material file to use. Should contain information about the stack of materials present."
+			}
+		},
+		{
+			"names" : ["-ic", "--invert-contrast"],
+			"spec"  : {
+				"dest"     : "invert_contrast",
+				"action"   : "store_true",
+				"help"     : "Invert the calculated contrast values before processing. (flip the sign)"
+			}
+		},
+		{
+			"names" : ["-W", "--image-width"],
+			"spec"  : {
+				"dest"     : "image_width",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The width (along x-direction) of the image at the current zoom (mm)."
+			}
+		},
+		{
+			"names" : ["-H", "--image-height"],
+			"spec"  : {
+				"dest"     : "image_height",
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The height (along y-direction) of the image at the current zoom (mm)."
 			}
 		}
 	]

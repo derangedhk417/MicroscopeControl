@@ -300,9 +300,9 @@ def getImgContrast(img, threshold=0.05):
 	G = G.astype(np.float32)
 	B = B.astype(np.float32)
 
-	R_con = -(R - R_mode) / R_mode
-	G_con = -(G - G_mode) / G_mode
-	B_con = -(B - B_mode) / B_mode
+	R_con = (R - R_mode) / R_mode
+	G_con = (G - G_mode) / G_mode
+	B_con = (B - B_mode) / B_mode
 
 	# Set everything less than the threshold value to zero.
 	R_con[R_con < threshold] = 0
@@ -467,8 +467,7 @@ if __name__ == '__main__':
 		plt.imshow(img)
 		plt.show()
 
-		contrast_img = getImgContrast(img, threshold=0.1)
-
+		contrast_img = getImgContrast(img, threshold=0.08)
 		data = contrast_img.reshape(
 			contrast_img.shape[0] * contrast_img.shape[1],
 			contrast_img.shape[2]

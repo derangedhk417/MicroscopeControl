@@ -23,7 +23,7 @@ import numpy             as np
 import matplotlib.pyplot as plt
 
 from multiprocessing import Pool
-from ImageProcessor  import ImageProcessor, FlakeExtractor
+from ImageProcessing import processFile
 from Progress        import ProgressBar
 
 # Process the command line arguments supplied to the program.
@@ -67,41 +67,6 @@ def getFilesSince(directory, timestamp):
 
 	return results
 
-def loadAndProcess(fpath, args):
-	try:
-		img = cv2.imread(fpath)
-		return processFile(img, fpath, args)
-	except Exception as ex:
-		print(ex)
-		raise ex
-
-
-def processFile(img, fpath, args):
-	extractor = FlakeExtractor(
-		img,
-		downscale=args.downscale,
-		threshold=args.rejection_threshold,
-		contrast_floor=args.contrast_floor
-	)
-
-	status, res = extractor.process(DEBUG_DISPLAY=args.debug_display)
-
-	del_dir = os.path.join(args.image_directory, "deleted")
-	if not os.path.isdir(del_dir):
-		os.mkdir(del_dir)
-
-	if status:
-		outfile = ".".join(fpath.split("\\")[-1].split(".")[:-1]) + '.json'
-		outpath = os.path.join("\\".join(fpath.split("\\")[:-1]), outfile)
-		with open(outpath, 'w') as file:
-			file.write(json.dumps(res))
-		return True, None
-	else:
-		path, file = os.path.split(fpath)
-		delpath    = os.path.join(path, "deleted", file)
-		shutil.move(fpath, delpath)
-		return False, fpath
-
 
 if __name__ == '__main__':
 	# Load the arguments file. 
@@ -109,7 +74,7 @@ if __name__ == '__main__':
 		args_specification = json.loads(file.read())
 	args  = preprocess(args_specification)
 
-	files = getFilesSince(args.image_directory, 0)
+	files = getFilesSince(args.output_directory, 0)
 
 	print("Processing %d files using %d processes."%(
 		len(files), 
@@ -130,7 +95,7 @@ if __name__ == '__main__':
 
 		while total_processed < len(files):
 			while current_in_process < args.n_processes and idx < len(files):
-				res = pool.apply_async(loadAndProcess, (files[idx], args))
+				res = pool.apply_async(processFile, (None, files[idx], args))
 				results.append(res)
 				idx                += 1
 				current_in_process += 1
