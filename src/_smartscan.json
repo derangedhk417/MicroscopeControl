@@ -23,7 +23,7 @@
 		{
 			"names" : ["-F", "--focus-points"],
 			"spec"  : {
-				"dest"     : "bounds",
+				"dest"     : "focus_points",
 				"nargs"    : "*",
 				"type"     : "float",
 				"default"  : null,

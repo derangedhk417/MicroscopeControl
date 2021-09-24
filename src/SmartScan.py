@@ -25,7 +25,7 @@ def preprocess(args_specification):
 
 def calibrateFocus(microscope, args):
 	focal_points = []
-	for x, y in points:
+	for x, y in args.focus_points:
 		microscope.stage.moveTo(x, y)
 		microscope.autoFocus(
 			args.focus_range,
@@ -46,7 +46,7 @@ def calibrateFocus(microscope, args):
 	def interp(X):
 		return res[0]*X[0] + res[1]*X[1] + res[2]
 
-	rmse = np.sqrt(np.square(interp(points.T) - focal_points).mean())
+	rmse = np.sqrt(np.square(interp(focus_points.T) - focal_points).mean())
 	print("The focal points have been fit to a function of the form z = ax + by + c.")
 	print("RMSE of fit: %f"%rmse)
 
@@ -103,6 +103,32 @@ def getRegionsOfInterest(img, args, x0, y0):
 		x += fine_w
 
 	return regions
+
+def parabolicSubtract(img, n_fit=128):
+	def fit(X, mmx, mmy, mx, my, b):
+		x, y = X
+		return mmx*x**2 + mmy*y**2 + mx*x + my*y + b
+
+	# Select a random subset of the image pixels to perform the fit on. This will be too slow 
+	# otherwise.
+	fit_x = np.random.randint(0, img.shape[1], (n_fit, ))
+	fit_y = np.random.randint(0, img.shape[0], (n_fit, ))
+	fit_points = np.stack([fit_x, fit_y], axis=1)
+
+	Z = img[fit_points[:, 0], fit_points[:, 1]]
+
+	res, cov = curve_fit(fit, fit_points, Z)
+
+	def interp(x, y):
+		return res[0]*x**2 + res[1]*y**2 + res[2]*x + res[3]*y + res[4]
+
+	X, Y = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
+	background = interp(X, Y)
+
+	return img - background
+
+
+
 
 if __name__ == '__main__':
 	with open("_smartscan.json", 'r') as file:
@@ -189,6 +215,7 @@ if __name__ == '__main__':
 		while y_current < y_max + coarse_h:
 			x, y = microscope.stage.getPosition()
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
+			img  = parabolicSubtract(img)
 			
 			# This function will return the coordinates of all of the regions within this image that
 			# contain potentially interesting flakes.
