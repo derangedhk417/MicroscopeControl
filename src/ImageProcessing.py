@@ -97,6 +97,11 @@ class ImageProcessor:
 		else:
 			self.min_area = 0.0
 
+		if 'skip_channel' in kwargs:
+			self.skip_channel = kwargs['skip_channel']
+		else:
+			self.skip_channel = None
+
 	# This will create a gaussian centered on each thickness value for each color channel. The 
 	# gaussian will be normalized and it's FWHM will be half the distance between itself and the
 	# next closest contrast value.
@@ -168,6 +173,16 @@ class ImageProcessor:
 
 		# Separate the channels.
 		B, G, R = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+
+		# At this step, if the user specified that they don't want a certain channel processed, 
+		# we'll duplicate another channel into it so that it won't interfere with calculations.
+		if self.skip_channel is not None:
+			if self.skip_channel == 'r':
+				R = B.copy()
+			elif self.skip_channel == 'g':
+				G = R.copy()
+			elif self.skip_channel == 'b':
+				B = R.copy()
 
 		def getMode(channel):
 			return np.argmax(np.bincount(channel.flatten()))
@@ -538,7 +553,8 @@ def processFile(img, fname, args):
 		downscale_factor=args.downscale,
 		debug=False,
 		output_path=args.output_directory,
-		image_dims=[args.image_height, args.image_width]
+		image_dims=[args.image_height, args.image_width],
+		skip_channel=args.skip_channel
 	)
 	p.processImage(fname)
 	return True, None
@@ -565,7 +581,7 @@ if __name__ == '__main__':
 
 	# KEEP THIS, IT SEEMS TO WORK WELL
 	p = ImageProcessor(
-		"_graphene_on_pdms.json", 
+		"_graphene.json", 
 		invert_contrast=True,
 		median_blur=False,
 		sharpen=True,
@@ -573,7 +589,8 @@ if __name__ == '__main__':
 		erode=3,
 		dilate=3,
 		debug=True,
-		downscale_factor=4,
-		output_path="pdms_001_graphene_scan_003"
+		downscale_factor=2,
+		output_path="pdms_001_graphene_scan_003",
+		skip_channel='b'
 	)
-	p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")
+	p.processImage("test/000074_-4.85180_1.85250.png")

@@ -20,6 +20,15 @@
 			}
 		},
 		{
+			"names" : ["-a", "--average-images"],
+			"spec"  : {
+				"dest"     : "average",
+				"type"     : "int",
+				"default"  : 1,
+				"help"     : "The number of images to average together for each image. If you are finding that a high amount of image noise is degrading the results of your scans, you can increase this number at the cost of performance."
+			}
+		},
+		{
 			"names" : ["-x", "--x-limits"],
 			"spec"  : {
 				"dest"     : "x_limits",
@@ -128,6 +137,31 @@
 				"dest"     : "invert_contrast",
 				"action"   : "store_true",
 				"help"     : "Invert the calculated contrast values before processing. (flip the sign)"
+			}
+		},
+		{
+			"names" : ["-po", "--preview-off"],
+			"spec"  : {
+				"dest"     : "no_preview",
+				"action"   : "store_true",
+				"help"     : "Don't display a preview of the scan. This may improve performance."
+			}
+		},
+		{
+			"names" : ["-qf", "--quality-focus"],
+			"spec"  : {
+				"dest"     : "quality_focus",
+				"action"   : "store_true",
+				"help"     : "Perform a more careful movement of the focus lens when refocusing the camera for each image. This is VERY expensive in terms of time, but it may improve image quality if the focus motor is misbehaving."
+			}
+		},
+		{
+			"names" : ["-sc", "--skip-channel"],
+			"spec"  : {
+				"dest"     : "skip_channel",
+				"type"     : "str",
+				"default"  : null,
+				"help"     : "Instructs the image processing code to not process the specified channel. It will instead copy one of the other channels over this channel before processing."
 			}
 		}
 	]
