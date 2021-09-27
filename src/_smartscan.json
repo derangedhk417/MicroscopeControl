@@ -1,5 +1,5 @@
 {
-	"Description" : "Scans the specified area of a substrate at low zoom in order to determine regions of interest. Zooms into these regions of interest, refines the focus of the camera and takes multiple images and averages them together to produce high quality images of areas of the substrate that contain flakes.",
+	"description" : "Scans the specified area of a substrate at low zoom in order to determine regions of interest. Zooms into these regions of interest, refines the focus of the camera and takes multiple images and averages them together to produce high quality images of areas of the substrate that contain flakes.",
 	"arguments" : [
 		{
 			"names" : ["-o", "--output"],
@@ -31,22 +31,13 @@
 			}
 		},
 		{
-			"names" : ["-e", "--exposure"],
-			"spec"  : {
-				"dest"     : "exposure",
-				"type"     : "float",
-				"required" : true,
-				"help"     : "The exposure time to use during the scan in milliseconds."
-			}
-		},
-		{
 			"names" : ["-f", "--fine-zoom"],
 			"spec"  : {
 				"dest"     : "fine_zoom",
 				"nargs"    : 4,
 				"type"     : "float",
 				"required" : true,
-				"help"     : "The zoom to use when taking high quality images of interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in milliseconds."
+				"help"     : "The zoom to use when taking high quality images of interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in seconds."
 			}
 		},
 		{
@@ -65,7 +56,7 @@
 				"nargs"    : 4,
 				"type"     : "float",
 				"required" : true,
-				"help"     : "The zoom to use when taking low quality images to find interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in milliseconds."
+				"help"     : "The zoom to use when taking low quality images to find interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in seconds."
 			}
 		},
 		{
@@ -93,7 +84,6 @@
 				"nargs"    : 2,
 				"type"     : "float",
 				"default"  : [0.45, 0.55],
-				"required" : true,
 				"help"     : "The range of values to sweep when focusing the camera. This can often be the current focal point +/- 0.05. Only very uneven or very large samples will have their focal points vary by more than that."
 			}
 		},
@@ -146,9 +136,9 @@
 			"spec"  : {
 				"dest"     : "max_focus_error",
 				"type"     : "float",
-				"default"  : 0.002,
+				"default"  : 0.005,
 				"help"     : "This is the maximume root mean squared error that the autofocus is allowed to have when approximating the focus as being linearly related to coordinates. If the error is higher than this the program will stop running before performing a full scan and print an error message."
 			}
-		},
+		}
 	]
 }

@@ -3,7 +3,25 @@
 #              at a much lower zoom in order to determine which regions contain flakes. It then
 #              zooms in on only those regions and takes high quality images of the flakes in them.
 
-from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy             as np
+import sys
+import time
+import code
+import argparse
+import os
+import cv2
+import json
+import threading
+import math
+
+from MicroscopeControl  import MicroscopeController
+from scipy.optimize     import curve_fit
+from matplotlib.patches import Rectangle
+from Progress           import ProgressBar
+from multiprocessing    import Pool
+from ImageProcessing    import processFile
+from datetime           import datetime
 
 def preprocess(args_specification):
 	parser = argparse.ArgumentParser(description=args_specification['description'])
@@ -24,8 +42,11 @@ def preprocess(args_specification):
 	return args
 
 def calibrateFocus(microscope, args):
+	focus_test_points = np.array([
+		args.focus_points[i:i + 2] for i in range(0, len(args.focus_points), 2)
+	])
 	focal_points = []
-	for x, y in args.focus_points:
+	for x, y in focus_test_points:
 		microscope.stage.moveTo(x, y)
 		microscope.autoFocus(
 			args.focus_range,
@@ -41,12 +62,13 @@ def calibrateFocus(microscope, args):
 		x, y = X
 		return mx*x + my*y + b
 
-	res, cov = curve_fit(fit, points.T, focal_points)
+	res, cov = curve_fit(fit, focus_test_points.T, focal_points)
 
 	def interp(X):
-		return res[0]*X[0] + res[1]*X[1] + res[2]
+		x, y = X
+		return res[0]*x + res[1]*y + res[2]
 
-	rmse = np.sqrt(np.square(interp(focus_points.T) - focal_points).mean())
+	rmse = np.sqrt(np.square(interp(focus_test_points.T) - focal_points).mean())
 	print("The focal points have been fit to a function of the form z = ax + by + c.")
 	print("RMSE of fit: %f"%rmse)
 
@@ -65,6 +87,7 @@ def getRegionsOfInterest(img, args, x0, y0):
 	# regions with the same size as an image at the fine zoom setting. We'll return an array of
 	# points corresponding to the top left corner of any such region that meets the criteria
 	# specified in the arguments to this program (negative_contrast, threshold_ratio).
+	
 	background = max(np.argmax(np.bincount(img.flatten())), 1)
 	img        = img.astype(np.float32)
 	contrast   = (background - img) / background
@@ -106,29 +129,31 @@ def getRegionsOfInterest(img, args, x0, y0):
 
 def parabolicSubtract(img, n_fit=128):
 	def fit(X, mmx, mmy, mx, my, b):
-		x, y = X
+		y, x = X
 		return mmx*x**2 + mmy*y**2 + mx*x + my*y + b
 
 	# Select a random subset of the image pixels to perform the fit on. This will be too slow 
 	# otherwise.
 	fit_x = np.random.randint(0, img.shape[1], (n_fit, ))
 	fit_y = np.random.randint(0, img.shape[0], (n_fit, ))
-	fit_points = np.stack([fit_x, fit_y], axis=1)
+	fit_points = np.stack([fit_y, fit_x], axis=1)
 
-	Z = img[fit_points[:, 0], fit_points[:, 1]]
+	Z = img[fit_y, fit_x]
 
-	res, cov = curve_fit(fit, fit_points, Z)
+	res, cov = curve_fit(fit, fit_points.T, Z)
 
-	def interp(x, y):
+	def interp(y, x):
 		return res[0]*x**2 + res[1]*y**2 + res[2]*x + res[3]*y + res[4]
 
-	X, Y = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
-	background = interp(X, Y)
+	Y, X = np.meshgrid(np.arange(img.shape[0]), np.arange(img.shape[1]))
+	background = interp(Y, X)
+	subtracted = img - background.T
 
-	return img - background
+	_min = subtracted.min()
+	_max = subtracted.max()
+	subtracted = (((subtracted - _min) / (_max - _min)) * 255).astype(np.uint8)
 
-
-
+	return subtracted
 
 if __name__ == '__main__':
 	with open("_smartscan.json", 'r') as file:
@@ -168,10 +193,10 @@ if __name__ == '__main__':
 	coarse_zoom, coarse_w, coarse_h, coarse_exposure = args.coarse_zoom
 
 	# Now we figure out how many images will need to be taken to perform the coarse scan.
-	n_coarse_images = int(round(1.1 * scan_area / (coarse_w * coarse_h)))
+	n_coarse_images = int(round(1.55 * scan_area / (coarse_w * coarse_h)))
 	disk_size       = (n_coarse_images * 5601754) / (1024 * 1024) 
 	print("This will produce roughly %d images and occupy %4.2f MB of disk space."%(
-		n_images, disk_size
+		n_coarse_images, disk_size
 	))
 
 	if input("Proceed (y/n)? ").lower() != 'y':
@@ -185,18 +210,21 @@ if __name__ == '__main__':
 	# Now we perform the focus calibration for the coarse scan. 
 	microscope.camera.setExposure(coarse_exposure)
 	microscope.focus.setZoom(coarse_zoom)
-	calibrateFocus(microscope, args)
+	interp = calibrateFocus(microscope, args)
 
 	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
 	# not the region warrants further inspection.
 	coarse_progress = ProgressBar("Coarse Scan", 12, n_coarse_images, 1, ea=20)
 
 	regions_of_interest  = []
-	image_number            = 0
+	image_number         = 0
 	x_current, y_current = x_min, y_min
 
 	microscope.stage.moveTo(x_current, y_current)
-	microscope.focus.setFocus(interp((x_current, y_current)))
+	microscope.focus.setFocus(
+		interp((x_current, y_current)),
+		corrected=True
+	)
 
 	def avgimg(n, ds):
 		imgs = []
@@ -239,10 +267,13 @@ if __name__ == '__main__':
 
 	coarse_progress.finish()
 
-	fine_progress = ProgressBar("Fine Scan", 12, len(regions_of_interest), 1, ea=20)
-
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
+	interp = calibrateFocus(microscope, args)
+
+	fine_progress = ProgressBar("Fine Scan", 12, len(regions_of_interest), 1, ea=20)
+
+	
 
 	def avgimg(n):
 		images = []
@@ -257,18 +288,24 @@ if __name__ == '__main__':
 		red   = np.stack(r, axis=2).mean(axis=2)
 		green = np.stack(g, axis=2).mean(axis=2)
 		blue  = np.stack(b, axis=2).mean(axis=2)
-		img   = np.stack([b, g, r], axis=2)
+		img   = np.stack([b, g, r], axis=2).astype(np.uint8)
 		return img
 
 	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
 	for idx, (x, y) in enumerate(regions_of_interest):
 		microscope.stage.moveTo(x, y)
+		microscope.focus.setFocus(
+			interp((x, y)),
+			corrected=True
+		)
 		img = avgimg(args.fine_averages)
 
 		filename = os.path.join(
 			args.output_directory,
 			"%04d_%2.4f_%2.4f.png"%(idx, x, y)
 		)
+
+
 
 		cv2.imwrite(filename, img)
 
