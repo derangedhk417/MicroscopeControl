@@ -138,7 +138,7 @@ def calibrate_square(xrng, yrng, microscope):
 
 if __name__ == '__main__':
 	# Load the arguments file. 
-	with open("Scan.json", 'r') as file:
+	with open("_scan.json", 'r') as file:
 		args_specification = json.loads(file.read())
 
 	args = preprocess(args_specification)
@@ -164,12 +164,10 @@ if __name__ == '__main__':
 
 	# Sanity check the parameters of the scan and print the stats to the user.
 	if args.x_limits[0] >= args.x_limits[1]:
-		print("Your x-limits are nonsensical.")
-		exit()
+		args.x_limits[0], args.x_limits[1] = args.x_limits[1], args.x_limits[0]
 
 	if args.y_limits[0] >= args.y_limits[1]:
-		print("Your y-limits are nonsensical.")
-		exit()
+		args.y_limits[0], args.y_limits[1] = args.y_limits[1], args.y_limits[0]
 
 
 	scan_area  = (args.x_limits[1] - args.x_limits[0])
@@ -258,7 +256,7 @@ if __name__ == '__main__':
 		n_total = int(n_total * 1.1)
 
 		# This progress bar will update every time an image is taken and will
-		# attempt to estimate the total time remaining after 30 seconds.
+		# attempt to estimate the total time remaining after 120 seconds.
 		pb1     = ProgressBar("Imaging Square (%d)"%n_squares, 30, n_total, 1, ea=120)
 		img_idx = 0
 		microscope.camera.setExposure(args.exposure)
@@ -267,7 +265,23 @@ if __name__ == '__main__':
 				while y_current < yh:
 					# Take an image
 					xc, yc = microscope.stage.getPosition()
-					img    = microscope.camera.getFrame(convert=False)
+
+					if args.average > 1:
+						images = []
+						for i in range(args.average):
+							images.append(microscope.camera.getFrame(convert=False))
+						r, g, b = [], [] ,[]
+						for i in images:
+							b.append(i[:, :, 0])
+							g.append(i[:, :, 1])
+							r.append(i[:, :, 2])
+
+						red   = np.stack(r, axis=2).mean(axis=2)
+						green = np.stack(g, axis=2).mean(axis=2)
+						blue  = np.stack(b, axis=2).mean(axis=2)
+						img   = np.stack([b, g, r], axis=2)
+					else:
+						img = microscope.camera.getFrame(convert=False)
 
 					scanned_locations.append([xc, yc])
 
@@ -285,8 +299,9 @@ if __name__ == '__main__':
 					})
 
 					decimated = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-					cv2.imshow('Scan Preview', decimated)
-					cv2.waitKey(1)
+					if not args.no_preview:
+						cv2.imshow('Scan Preview', decimated)
+						cv2.waitKey(1)
 
 					cv2.imwrite(fname, img)
 
@@ -299,7 +314,7 @@ if __name__ == '__main__':
 					microscope.stage.moveTo(x_current, y_current)
 					microscope.focus.setFocus(
 						interp((x_current, y_current)), 
-						corrected=False
+						corrected=args.quality_focus
 					)
 
 				y_current = y
