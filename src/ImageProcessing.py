@@ -261,6 +261,8 @@ class ImageProcessor:
 			contrast_img, calc_disagreement=False
 		)
 
+		code.interact(local=locals())
+
 		# Now that we have the layer data, we use it to create a mask where 1 corresponds to flake
 		# and 0 corresponds to background. We'll use this to contour each flake. This information
 		# will be used later on by the user when they're filtering which flakes they want to look
@@ -564,16 +566,30 @@ if __name__ == '__main__':
 	# p.processImage("test/Image2.png")
 
 	# KEEP THIS, IT SEEMS TO WORK WELL
+	# p = ImageProcessor(
+	# 	"_graphene_on_pdms.json", 
+	# 	invert_contrast=True,
+	# 	median_blur=False,
+	# 	sharpen=True,
+	# 	denoise=0,
+	# 	erode=3,
+	# 	dilate=3,
+	# 	debug=True,
+	# 	downscale_factor=4,
+	# 	output_path="pdms_001_graphene_scan_003"
+	# )
+	# p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")
+
 	p = ImageProcessor(
-		"_graphene_on_pdms.json", 
-		invert_contrast=True,
+		"_graphene_on_SiO2_Silicon.json", 
+		invert_contrast=False,
 		median_blur=False,
 		sharpen=True,
 		denoise=0,
 		erode=3,
 		dilate=3,
 		debug=True,
-		downscale_factor=4,
-		output_path="pdms_001_graphene_scan_003"
+		downscale_factor=2,
+		output_path="test"
 	)
-	p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")
+	p.processImage("image001.bmp")
