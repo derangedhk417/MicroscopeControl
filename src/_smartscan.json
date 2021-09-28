@@ -108,7 +108,7 @@
 			"spec"  : {
 				"dest"     : "threshold_ratio",
 				"type"     : "float",
-				"default"  : 0.01,
+				"default"  : 0.005,
 				"help"     : "This is the minimum ratio of area containing flakes to area not containing flakes in a region necessary for it to be labelled a region of interest and scanned carefully."
 			}
 		},

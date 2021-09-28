@@ -22,6 +22,9 @@ from Progress           import ProgressBar
 from multiprocessing    import Pool
 from ImageProcessing    import processFile
 from datetime           import datetime
+from skimage            import data, restoration, util
+
+from mpl_toolkits.mplot3d import Axes3D
 
 def preprocess(args_specification):
 	parser = argparse.ArgumentParser(description=args_specification['description'])
@@ -83,6 +86,18 @@ def getRegionsOfInterest(img, args, x0, y0):
 	fine_zoom,   fine_w,   fine_h,   fine_exposure   = args.fine_zoom
 	coarse_zoom, coarse_w, coarse_h, coarse_exposure = args.coarse_zoom
 
+	
+
+	# This image will have had the background subtracted and will be float32 as a result. 
+	# We want to convert it back to a uint8 array.
+	_min = img.min()
+	_max = img.max()
+	img  = (((img - _min) / (_max - _min)) * 255).astype(np.uint8)
+
+	pv = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
+	cv2.imshow('Scan Preview', pv)
+	cv2.waitKey(250)
+
 	# We want to calculate the contrast of every pixel in the image and then subdivide it into 
 	# regions with the same size as an image at the fine zoom setting. We'll return an array of
 	# points corresponding to the top left corner of any such region that meets the criteria
@@ -104,9 +119,10 @@ def getRegionsOfInterest(img, args, x0, y0):
 	# Now we iterate over the above mentioned regions of this image and calculate the percentage
 	# of each image that has contrast greater than zero.
 	x, y    = 0, 0
-	regions = [] 
-	while x < coarse_w - fine_w:
-		while y < coarse_h - fine_h:
+	regions = []
+	pixel_coordinates = [] # DEBUG
+	while x < coarse_w:
+		while y < coarse_h:
 			# We need to convert coordinates into indices into the image array so that we can select
 			# the correct subset of pixels for the calculation.
 			y_low  = int(round(y  / mm_per_pixel))
@@ -119,11 +135,33 @@ def getRegionsOfInterest(img, args, x0, y0):
 			ratio    = subimage[subimage > 0].sum() / (subimage.shape[0] * subimage.shape[1])
 
 			if ratio > args.threshold_ratio:
+				pixel_coordinates.append([x_low, x_high, y_low, y_high]) # DEBUG
 				regions.append([x + x0, y + y0])
 
 			y += fine_h
 		y = 0
 		x += fine_w
+
+	# DEBUG
+	timg = contrast.copy()
+	rect_color = contrast.max() * 2
+	for rect in pixel_coordinates:
+		timg = cv2.rectangle(
+			timg, 
+			(rect[0], rect[2]), 
+			(rect[1], rect[3]), 
+			(rect_color, 0, 0), 
+			1
+		)
+	# plt.imshow(timg)
+	# plt.show()
+	_min = timg.min()
+	_max = timg.max()
+	timg  = (((timg - _min) / (_max - _min)) * 255).astype(np.uint8)
+	pv = cv2.resize(timg, (0, 0), fx=0.3, fy=0.3)
+	cv2.imshow('Scan Preview', pv)
+	cv2.waitKey(250)
+	# END DEBUG
 
 	return regions
 
@@ -153,7 +191,102 @@ def parabolicSubtract(img, n_fit=128):
 	_max = subtracted.max()
 	subtracted = (((subtracted - _min) / (_max - _min)) * 255).astype(np.uint8)
 
+	code.interact(local=locals())
+
 	return subtracted
+
+# Used for debugging purposes. Creates a 3d surface plot of an image.
+def plotImage(img, ds=20):
+	img = cv2.resize(img, (0, 0), fx=(1 / ds), fy=(1 / ds))
+	xx, yy = np.mgrid[0:img.shape[0], 0:img.shape[1]]
+
+	fig = plt.figure()
+	ax  = fig.gca(projection='3d')
+	ax.plot_surface(xx, yy, img ,rstride=1, cstride=1, cmap=plt.cm.jet, linewidth=0)
+	plt.show()
+
+def calculateBackground(args, focus_interp, microscope):
+	x_min, x_max, y_min, y_max = args.bounds
+	# After initial testing I realized that this system produces a background that cannot be 
+	# approximated as a simple function when the zoom is not very close to being maxed out. As a 
+	# result, it's necessary to determine this background before taking serious images. In order
+	# to do this, we take many images at random positions, perform a rolling ball background 
+	# subtraction and then take an average of them to get the background. The rolling ball 
+	# algorithm tends to produce some irregularities around flakes, so we won't take a regular 
+	# average. Instead we will take the standard deviation of each pixel across images and throw
+	# out values that are far outside of the mean.
+	n_background_images = 20
+	bg_img_progress = ProgressBar("Background Images", 18, n_background_images, 1, ea=10)
+	positions           = np.array([
+		np.random.uniform(x_min, x_max, n_background_images), 
+		np.random.uniform(y_min, y_max, n_background_images)
+	])
+	images = []
+	for i, (x, y) in enumerate(positions.T):
+		microscope.stage.moveTo(x, y)
+		microscope.focus.setFocus(
+			focus_interp((x, y)),
+			corrected=False
+		)
+		images.append(avgimg(args.coarse_averages, args.coarse_downscale))
+		bg_img_progress.update(i + 1)
+
+	bg_img_progress.finish()
+
+	bg_calc_progress = ProgressBar("Background Calc", 18, n_background_images, 1, ea=10)
+	backgrounds      = []
+	for i, img in enumerate(images):
+		inv = util.invert(img)
+		bg  = restoration.rolling_ball(inv, radius=15)
+		bg  = util.invert(bg)
+		backgrounds.append(bg)
+		bg_calc_progress.update(i + 1)
+
+	bg_calc_progress.finish()
+
+	bgs   = np.stack(backgrounds, axis=2)
+	means = bgs.mean(axis=2)
+	stds  = bgs.std(axis=2)
+
+	weights = []
+	for img in backgrounds:
+		mask         = np.abs(img - means) < 1.2 * stds
+		weight       = np.ones(mask.shape) * 0.01
+		weight[mask] = 1.0
+		weights.append(weight) 
+
+	weights    = np.stack(weights, axis=2)
+	background = np.average(bgs, axis=2, weights=weights)
+
+	# Now we background subtract all of the images and try to perform the same process to remove
+	# any background that wasn't picked up by rolling ball.
+	subbed = []
+	for img in images:
+		subbed.append(img - background)
+
+	subbed_s = np.stack(subbed, axis=2)
+	means    = subbed_s.mean(axis=2)
+	stds     = subbed_s.std(axis=2)
+
+	weights = []
+	for img in subbed:
+		mask         = np.abs(img - means) < 1.2 * stds
+		weight       = np.ones(mask.shape) * 0.01
+		weight[mask] = 1.0
+		weights.append(weight) 
+
+	weights      = np.stack(weights, axis=2)
+	background_s = np.average(subbed_s, axis=2, weights=weights)
+	background   = background + background_s
+
+	# fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+	# ax1.imshow(images[0])
+	# ax2.imshow(background)
+	# ax3.imshow(images[0] - background)
+	# plt.show()
+	# plotImage(background)
+	# code.interact(local=locals())
+	return background
 
 if __name__ == '__main__':
 	with open("_smartscan.json", 'r') as file:
@@ -212,20 +345,6 @@ if __name__ == '__main__':
 	microscope.focus.setZoom(coarse_zoom)
 	interp = calibrateFocus(microscope, args)
 
-	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
-	# not the region warrants further inspection.
-	coarse_progress = ProgressBar("Coarse Scan", 12, n_coarse_images, 1, ea=20)
-
-	regions_of_interest  = []
-	image_number         = 0
-	x_current, y_current = x_min, y_min
-
-	microscope.stage.moveTo(x_current, y_current)
-	microscope.focus.setFocus(
-		interp((x_current, y_current)),
-		corrected=True
-	)
-
 	def avgimg(n, ds):
 		imgs = []
 		for i in range(n):
@@ -239,11 +358,30 @@ if __name__ == '__main__':
 
 		return (base / n).astype(np.uint8)
 
+	coarse_background = calculateBackground(args, interp, microscope)
+
+	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
+	# not the region warrants further inspection.
+	coarse_progress = ProgressBar("Coarse Scan", 18, n_coarse_images, 1, ea=20)
+
+	regions_of_interest  = []
+	image_number         = 0
+	x_current, y_current = x_min, y_min
+
+	microscope.stage.moveTo(x_current, y_current)
+	microscope.focus.setFocus(
+		interp((x_current, y_current)),
+		corrected=True
+	)
+
 	while x_current < x_max + coarse_w:
 		while y_current < y_max + coarse_h:
 			x, y = microscope.stage.getPosition()
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
-			img  = parabolicSubtract(img)
+			pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
+			cv2.imshow('Scan Preview', pv)
+			cv2.waitKey(250)
+			img  = img - coarse_background
 			
 			# This function will return the coordinates of all of the regions within this image that
 			# contain potentially interesting flakes.
@@ -271,7 +409,7 @@ if __name__ == '__main__':
 	microscope.camera.setExposure(fine_exposure)
 	interp = calibrateFocus(microscope, args)
 
-	fine_progress = ProgressBar("Fine Scan", 12, len(regions_of_interest), 1, ea=20)
+	fine_progress = ProgressBar("Fine Scan", 18, len(regions_of_interest), 1, ea=20)
 
 	
 
