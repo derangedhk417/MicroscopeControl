@@ -44,7 +44,7 @@ def preprocess(args_specification):
 
 	return args
 
-def calibrateFocus(microscope, args):
+def calibrateFocus(microscope, args, debug=False):
 	focus_test_points = np.array([
 		args.focus_points[i:i + 2] for i in range(0, len(args.focus_points), 2)
 	])
@@ -55,7 +55,8 @@ def calibrateFocus(microscope, args):
 			args.focus_range,
 			args.autofocus_parameters[0],
 			args.autofocus_parameters[1],
-			args.autofocus_parameters[2]
+			args.autofocus_parameters[2],
+			debug=debug
 		)
 		focal_points.append(microscope.focus.getFocus())
 
@@ -121,8 +122,8 @@ def getRegionsOfInterest(img, args, x0, y0):
 	x, y    = 0, 0
 	regions = []
 	pixel_coordinates = [] # DEBUG
-	while x < coarse_w:
-		while y < coarse_h:
+	while x < coarse_w - fine_w:
+		while y < coarse_h - fine_h:
 			# We need to convert coordinates into indices into the image array so that we can select
 			# the correct subset of pixels for the calculation.
 			y_low  = int(round(y  / mm_per_pixel))
@@ -205,7 +206,7 @@ def plotImage(img, ds=20):
 	ax.plot_surface(xx, yy, img ,rstride=1, cstride=1, cmap=plt.cm.jet, linewidth=0)
 	plt.show()
 
-def calculateBackground(args, focus_interp, microscope):
+def calculateBackgroundGreyscale(args, focus_interp, microscope):
 	x_min, x_max, y_min, y_max = args.bounds
 	# After initial testing I realized that this system produces a background that cannot be 
 	# approximated as a simple function when the zoom is not very close to being maxed out. As a 
@@ -231,53 +232,19 @@ def calculateBackground(args, focus_interp, microscope):
 		images.append(avgimg(args.coarse_averages, args.coarse_downscale))
 		bg_img_progress.update(i + 1)
 
-	bg_img_progress.finish()
-
-	bg_calc_progress = ProgressBar("Background Calc", 18, n_background_images, 1, ea=10)
-	backgrounds      = []
-	for i, img in enumerate(images):
-		inv = util.invert(img)
-		bg  = restoration.rolling_ball(inv, radius=15)
-		bg  = util.invert(bg)
-		backgrounds.append(bg)
-		bg_calc_progress.update(i + 1)
-
-	bg_calc_progress.finish()
-
-	bgs   = np.stack(backgrounds, axis=2)
-	means = bgs.mean(axis=2)
-	stds  = bgs.std(axis=2)
+	imgs  = np.stack(images, axis=2)
+	means = imgs.mean(axis=2)
+	stds  = imgs.std(axis=2)
 
 	weights = []
-	for img in backgrounds:
+	for img in images:
 		mask         = np.abs(img - means) < 1.2 * stds
-		weight       = np.ones(mask.shape) * 0.01
+		weight       = np.ones(mask.shape) * 0.001
 		weight[mask] = 1.0
 		weights.append(weight) 
 
 	weights    = np.stack(weights, axis=2)
-	background = np.average(bgs, axis=2, weights=weights)
-
-	# Now we background subtract all of the images and try to perform the same process to remove
-	# any background that wasn't picked up by rolling ball.
-	subbed = []
-	for img in images:
-		subbed.append(img - background)
-
-	subbed_s = np.stack(subbed, axis=2)
-	means    = subbed_s.mean(axis=2)
-	stds     = subbed_s.std(axis=2)
-
-	weights = []
-	for img in subbed:
-		mask         = np.abs(img - means) < 1.2 * stds
-		weight       = np.ones(mask.shape) * 0.01
-		weight[mask] = 1.0
-		weights.append(weight) 
-
-	weights      = np.stack(weights, axis=2)
-	background_s = np.average(subbed_s, axis=2, weights=weights)
-	background   = background + background_s
+	background = np.average(imgs, axis=2, weights=weights)
 
 	# fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 	# ax1.imshow(images[0])
@@ -285,6 +252,84 @@ def calculateBackground(args, focus_interp, microscope):
 	# ax3.imshow(images[0] - background)
 	# plt.show()
 	# plotImage(background)
+	# code.interact(local=locals())
+	return background
+
+def calculateBackgroundColored(args, focus_interp, microscope):
+	x_min, x_max, y_min, y_max = args.bounds
+	# After initial testing I realized that this system produces a background that cannot be 
+	# approximated as a simple function when the zoom is not very close to being maxed out. As a 
+	# result, it's necessary to determine this background before taking serious images. In order
+	# to do this, we take many images at random positions, perform a rolling ball background 
+	# subtraction and then take an average of them to get the background. The rolling ball 
+	# algorithm tends to produce some irregularities around flakes, so we won't take a regular 
+	# average. Instead we will take the standard deviation of each pixel across images and throw
+	# out values that are far outside of the mean.
+	n_background_images = 20
+	bg_img_progress = ProgressBar("Background Images", 18, n_background_images, 1, ea=10)
+	positions           = np.array([
+		np.random.uniform(x_min, x_max, n_background_images), 
+		np.random.uniform(y_min, y_max, n_background_images)
+	])
+	images = []
+	for i, (x, y) in enumerate(positions.T):
+		microscope.stage.moveTo(x, y)
+		microscope.focus.setFocus(
+			focus_interp((x, y)),
+			corrected=False
+		)
+		images.append(avgimg(args.coarse_averages))
+		bg_img_progress.update(i + 1)
+
+	imgs_r_arr = [i[:, :, 2] for i in images]
+	imgs_g_arr = [i[:, :, 1] for i in images]
+	imgs_b_arr = [i[:, :, 0] for i in images]
+	imgs_r = np.stack(imgs_r_arr, axis=2)
+	imgs_g = np.stack(imgs_g_arr, axis=2)
+	imgs_b = np.stack(imgs_b_arr, axis=2)
+	means_r = imgs_r.mean(axis=2)
+	means_g = imgs_g.mean(axis=2)
+	means_b = imgs_b.mean(axis=2)
+	stds_r  = imgs_r.std(axis=2)
+	stds_g  = imgs_g.std(axis=2)
+	stds_b  = imgs_b.std(axis=2)
+
+	weights_r = []
+	weights_g = []
+	weights_b = []
+	for img_r, img_g, img_b in zip(imgs_r_arr, imgs_g_arr, imgs_b_arr):
+		mask_r       = np.abs(img_r - means_r) < 1.2 * stds_r
+		mask_g       = np.abs(img_g - means_g) < 1.2 * stds_g
+		mask_b       = np.abs(img_b - means_b) < 1.2 * stds_b
+
+		weight_r       = np.ones(mask_r.shape) * 0.001
+		weight_r[mask] = 1.0
+		weights_r.append(weight_r) 
+
+		weight_g       = np.ones(mask_g.shape) * 0.001
+		weight_g[mask] = 1.0
+		weights_g.append(weight_g) 
+
+		weight_b       = np.ones(mask_b.shape) * 0.001
+		weight_b[mask] = 1.0
+		weights_b.append(weight_b) 
+
+	weights_r  = np.stack(weights_r, axis=2)
+	background_r = np.average(imgs_r, axis=2, weights=weights_r)
+
+	weights_g  = np.stack(weights_g, axis=2)
+	background_g = np.average(imgs_g, axis=2, weights=weights_g)
+
+	weights_b  = np.stack(weights_b, axis=2)
+	background_b = np.average(imgs_b, axis=2, weights=weights_b)
+
+	background = np.stack([background_b, background_g, background_r], axis=2)
+
+	fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+	ax1.imshow(images[0])
+	ax2.imshow(background)
+	ax3.imshow(images[0] - background)
+	plt.show()
 	# code.interact(local=locals())
 	return background
 
@@ -326,7 +371,7 @@ if __name__ == '__main__':
 	coarse_zoom, coarse_w, coarse_h, coarse_exposure = args.coarse_zoom
 
 	# Now we figure out how many images will need to be taken to perform the coarse scan.
-	n_coarse_images = int(round(1.55 * scan_area / (coarse_w * coarse_h)))
+	n_coarse_images = int(round(1.86 * scan_area / (coarse_w * coarse_h)))
 	disk_size       = (n_coarse_images * 5601754) / (1024 * 1024) 
 	print("This will produce roughly %d images and occupy %4.2f MB of disk space."%(
 		n_coarse_images, disk_size
@@ -343,7 +388,7 @@ if __name__ == '__main__':
 	# Now we perform the focus calibration for the coarse scan. 
 	microscope.camera.setExposure(coarse_exposure)
 	microscope.focus.setZoom(coarse_zoom)
-	interp = calibrateFocus(microscope, args)
+	interp = calibrateFocus(microscope, args, debug=False)
 
 	def avgimg(n, ds):
 		imgs = []
@@ -358,7 +403,7 @@ if __name__ == '__main__':
 
 		return (base / n).astype(np.uint8)
 
-	coarse_background = calculateBackground(args, interp, microscope)
+	coarse_background = calculateBackgroundGreyscale(args, interp, microscope)
 
 	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
 	# not the region warrants further inspection.
@@ -407,11 +452,9 @@ if __name__ == '__main__':
 
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
-	interp = calibrateFocus(microscope, args)
+	interp = calibrateFocus(microscope, args, debug=False)
 
 	fine_progress = ProgressBar("Fine Scan", 18, len(regions_of_interest), 1, ea=20)
-
-	
 
 	def avgimg(n):
 		images = []
@@ -429,21 +472,27 @@ if __name__ == '__main__':
 		img   = np.stack([b, g, r], axis=2).astype(np.uint8)
 		return img
 
+	fine_background = calculateBackgroundColored(args, interp, microscope)
+
+	
+
 	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
 	for idx, (x, y) in enumerate(regions_of_interest):
 		microscope.stage.moveTo(x, y)
 		microscope.focus.setFocus(
 			interp((x, y)),
-			corrected=True
+			corrected=args.quality_focus
 		)
+		code.interact(local=locals())
 		img = avgimg(args.fine_averages)
+		img = img - fine_background
+
+
 
 		filename = os.path.join(
 			args.output_directory,
 			"%04d_%2.4f_%2.4f.png"%(idx, x, y)
 		)
-
-
 
 		cv2.imwrite(filename, img)
 

@@ -87,7 +87,7 @@ class MicroscopeController:
 		self.focus.cleanup()
 		self.stage.cleanup()
 
-	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False):
+	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False, debug=False):
 		if ndiv < 5:
 			raise Exception("You must specify ndiv >= 5.")
 
@@ -172,8 +172,12 @@ class MicroscopeController:
 				# get the best possible precision on the Laplacians.
 				
 				img = cv2.fastNlMeansDenoising(img, 20)
+				#lpl = cv2.Laplacian(img, -1, ksize=3)
+				#max_laplace.append(lpl.max())
+				# lpl = cv2.Laplacian(img, -1, ksize=3)
+				# max_laplace.append(np.percentile(lpl.flatten(), 99))
 				lpl = cv2.Laplacian(img, -1, ksize=3)
-				max_laplace.append(lpl.max())
+				max_laplace.append(lpl.mean())
 				
 				idx += 1
 				pb2.update(idx)
@@ -192,6 +196,10 @@ class MicroscopeController:
 			
 
 		self.focus.setFocus(focus_position)
+
+		if debug:
+			print("DEBUG = True (MicroscopeController.autoFocus)")
+			code.interact(local=locals())
 
 		# If auto exposure was on when this was called, turn it back on.
 		if exposure_on:
