@@ -87,7 +87,7 @@ class MicroscopeController:
 		self.focus.cleanup()
 		self.stage.cleanup()
 
-	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False, debug=False):
+	def autoFocus(self, _range, ndiv=100, passes=1, navg=3, autoExpose=False, gfit=False, debug=False):
 		if ndiv < 5:
 			raise Exception("You must specify ndiv >= 5.")
 
@@ -184,11 +184,32 @@ class MicroscopeController:
 
 			pb2.finish()
 
-			# Select the image with the highest maximum value for its Laplacian
-			best_idx = np.argmax(max_laplace)
-			_max = np.array(max_laplace).max()
-			
-			focus_position = positions[best_idx]
+			if gfit:
+				max_laplace = np.array(max_laplace)
+				steps       = np.array(steps)
+				def fn(x, a, b, c, d):
+					return a*np.exp(-np.square(x - b) / np.square(c)) + d
+
+				a0 = max_laplace.max() - max_laplace.min()
+				b0 = (steps[-1] + steps[0]) / 2
+				c0 = 0.00821672789208
+				d0 = max_laplace.min()
+				# def test(x):
+				# 	return a0*np.exp(-np.square(x - b0) / np.square(c0)) + d0
+
+				# plt.plot(steps, max_laplace)
+				# plt.plot(steps, test(steps))
+				# plt.show()
+				res, cov = curve_fit(fn, steps, max_laplace, p0=[a0, b0, c0, d0])
+				focus_position = res[1]
+				if debug:
+					code.interact(local=locals())
+			else:
+				# Select the image with the highest maximum value for its Laplacian
+				best_idx = np.argmax(max_laplace)
+				_max = np.array(max_laplace).max()
+				
+				focus_position = positions[best_idx]
 
 			# Modify the focus range in case there is another pass to run.
 			width          = current_range[1] - current_range[0]

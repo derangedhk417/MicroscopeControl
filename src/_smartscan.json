@@ -64,7 +64,7 @@
 			"spec"  : {
 				"dest"     : "coarse_averages",
 				"type"     : "int",
-				"default"  : 6,
+				"default"  : 3,
 				"help"     : "The number of images to average together when taking zoomed out images."
 			}
 		},
@@ -138,6 +138,15 @@
 				"type"     : "float",
 				"default"  : 0.005,
 				"help"     : "This is the maximume root mean squared error that the autofocus is allowed to have when approximating the focus as being linearly related to coordinates. If the error is higher than this the program will stop running before performing a full scan and print an error message."
+			}
+		},
+		{
+			"names" : ["-bi", "--background-images"],
+			"spec"  : {
+				"dest"     : "n_background_images",
+				"type"     : "int",
+				"default"  : 10,
+				"help"     : "The number of randomly positioned images to take when calculating the background."
 			}
 		}
 	]
