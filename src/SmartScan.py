@@ -99,7 +99,7 @@ def getRegionsOfInterest(img, args, x0, y0):
 
 	pv = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
 	cv2.imshow('Scan Preview', pv)
-	cv2.waitKey(250)
+	cv2.waitKey(1)
 
 	# We want to calculate the contrast of every pixel in the image and then subdivide it into 
 	# regions with the same size as an image at the fine zoom setting. We'll return an array of
@@ -124,8 +124,8 @@ def getRegionsOfInterest(img, args, x0, y0):
 	x, y    = 0, 0
 	regions = []
 	pixel_coordinates = [] # DEBUG
-	while x < coarse_w - fine_w:
-		while y < coarse_h - fine_h:
+	while x < coarse_w - (fine_w / 2):
+		while y < coarse_h - (fine_h / 2):
 			# We need to convert coordinates into indices into the image array so that we can select
 			# the correct subset of pixels for the calculation.
 			y_low  = int(round(y  / mm_per_pixel))
@@ -134,8 +134,11 @@ def getRegionsOfInterest(img, args, x0, y0):
 			x_low  = int(round(x  / mm_per_pixel))
 			x_high = int(round((x + fine_w) / mm_per_pixel)) + 1
 
-			subimage = contrast[y_low:y_high, x_low:x_high]
-			ratio    = subimage[subimage > 0].sum() / (subimage.shape[0] * subimage.shape[1])
+			subimage   = contrast[y_low:y_high, x_low:x_high]
+			#ratio      = ((subimage > 0) & (subimage < 0.2)).sum() / (subimage.shape[0] * subimage.shape[1])
+			ratio      = ((subimage > 0)).sum() / (subimage.shape[0] * subimage.shape[1])
+
+
 
 			if ratio > args.threshold_ratio:
 				pixel_coordinates.append([x_low, x_high, y_low, y_high]) # DEBUG
@@ -154,7 +157,7 @@ def getRegionsOfInterest(img, args, x0, y0):
 			(rect[0], rect[2]), 
 			(rect[1], rect[3]), 
 			(rect_color, 0, 0), 
-			1
+			3
 		)
 	# plt.imshow(timg)
 	# plt.show()
@@ -163,7 +166,7 @@ def getRegionsOfInterest(img, args, x0, y0):
 	timg  = (((timg - _min) / (_max - _min)) * 255).astype(np.uint8)
 	pv = cv2.resize(timg, (0, 0), fx=0.3, fy=0.3)
 	cv2.imshow('Scan Preview', pv)
-	cv2.waitKey(250)
+	cv2.waitKey(1)
 	# END DEBUG
 
 	return regions
@@ -456,7 +459,7 @@ if __name__ == '__main__':
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
 			pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
 			cv2.imshow('Scan Preview', pv)
-			cv2.waitKey(250)
+			cv2.waitKey(1)
 			img  = img - coarse_background
 			
 			# This function will return the coordinates of all of the regions within this image that
