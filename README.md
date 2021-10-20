@@ -1,5 +1,7 @@
 # MicroscopeControl
 
+See [Smart Scan](https://github.com/derangedhk417/MicroscopeControl/wiki/Using-Smart-Scan) for instructions on the part of this repository that is useful to most users.
+
 # TODO
 
 - Write routine for refinding flakes based on shape moments.
