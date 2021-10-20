@@ -96,14 +96,6 @@
 			}
 		},
 		{
-			"names" : ["-nc", "--negative-contrast"],
-			"spec"  : {
-				"dest"     : "negative_contrast",
-				"action"   : "store_true",
-				"help"     : "The contrast of the flakes being searched for is expected to be negative. In this system, contrast is defined to be positive when a flake is slightly darker than the background. If the material being scanned is brighter than the background, this parameter should be specified."
-			}
-		},
-		{
 			"names" : ["-tr", "--threshold-ratio"],
 			"spec"  : {
 				"dest"     : "threshold_ratio",
@@ -113,12 +105,13 @@
 			}
 		},
 		{
-			"names" : ["-ct", "--contrast-threshold"],
+			"names" : ["-cr", "--contrast-range"],
 			"spec"  : {
-				"dest"     : "contrast_threshold",
+				"dest"     : "contrast_range",
+				"nargs"    : 2,
 				"type"     : "float",
-				"default"  : 0.03,
-				"help"     : "When determining whether or not a region should be scanned in more detail, pixels with contrast lower than this value will be set to zero and not considered."
+				"required" : true,
+				"help"     : "Pixels with a contrast value in this range are counted when determining the percentage of an image that contains relevant material."
 			}
 		},
 		{

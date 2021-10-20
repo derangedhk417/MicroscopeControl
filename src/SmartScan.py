@@ -3,6 +3,9 @@
 #              at a much lower zoom in order to determine which regions contain flakes. It then
 #              zooms in on only those regions and takes high quality images of the flakes in them.
 
+# TODO: Use the four corners for focusing when focus points not specified.
+
+
 import matplotlib.pyplot as plt
 import numpy             as np
 import sys
@@ -110,10 +113,6 @@ def getRegionsOfInterest(img, args, x0, y0):
 	img        = img.astype(np.float32)
 	contrast   = (background - img) / background
 
-	if args.negative_contrast:
-		contrast = -contrast
-
-	contrast[contrast < args.contrast_threshold] = 0
 
 	mm_per_pixel_x = coarse_w / contrast.shape[1]
 	mm_per_pixel_y = coarse_h / contrast.shape[0]
@@ -135,8 +134,22 @@ def getRegionsOfInterest(img, args, x0, y0):
 			x_high = int(round((x + fine_w) / mm_per_pixel)) + 1
 
 			subimage   = contrast[y_low:y_high, x_low:x_high]
-			#ratio      = ((subimage > 0) & (subimage < 0.2)).sum() / (subimage.shape[0] * subimage.shape[1])
-			ratio      = ((subimage > 0)).sum() / (subimage.shape[0] * subimage.shape[1])
+			relevant   = (subimage >= args.contrast_range[0]) & (subimage <= args.contrast_range[1])
+			r          = subimage.copy()
+
+			r[relevant]          = 1.0
+			r[relevant == False] = 0.0
+			ksize   = 4
+			kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+			eroded  = cv2.erode(r, kernel)
+			dilated = cv2.dilate(eroded, kernel)
+			ratio   = dilated.sum() / (subimage.shape[0] * subimage.shape[1])
+
+			#code.interact(local=locals())
+
+			
+			
+			
 
 
 
@@ -365,6 +378,15 @@ if __name__ == '__main__':
 	# Estimate the size of the scanned area and process the limits arguments.
 	x_min, x_max, y_min, y_max = args.bounds
 
+	if args.focus_points is None:
+		args.focus_points = [
+			x_min, y_min,
+			x_min, y_max,
+			x_max, y_min,
+			x_max, y_max,
+			(x_min + x_max) / 2, (y_min + y_max) / 2
+		]
+
 	scan_area = (x_max - x_min) * (y_max - y_min)
 	meta_data['scan_area'] = scan_area
 
@@ -395,7 +417,7 @@ if __name__ == '__main__':
 	# Now we perform the focus calibration for the coarse scan. 
 	microscope.camera.setExposure(coarse_exposure)
 	microscope.focus.setZoom(coarse_zoom)
-	interp = calibrateFocus(microscope, args, debug=False, gfit=True)
+	interp = calibrateFocus(microscope, args, debug=False, gfit=False)
 
 	def avgimg(n, ds):
 		imgs = []
