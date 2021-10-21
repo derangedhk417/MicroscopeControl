@@ -137,6 +137,12 @@ def getRegionsOfInterest(img, args, x0, y0):
 			relevant   = (subimage >= args.contrast_range[0]) & (subimage <= args.contrast_range[1])
 			r          = subimage.copy()
 
+			# The halo effect around flakes causes problems when attempting to identify flake 
+			# thickness. The halo around a flake tends to smoothly transition between the optical
+			# contrast of the flake itself and the substrate. This results in 1-5 pixels around the
+			# flake that appear to have lower optical contrast but aren't actually real. The erode
+			# and dilate process below tends to eliminate the halo pixels that contain incorrect 
+			# contrast values.
 			r[relevant]          = 1.0
 			r[relevant == False] = 0.0
 			ksize   = 4
@@ -145,17 +151,13 @@ def getRegionsOfInterest(img, args, x0, y0):
 			dilated = cv2.dilate(eroded, kernel)
 			ratio   = dilated.sum() / (subimage.shape[0] * subimage.shape[1])
 
-			#code.interact(local=locals())
-
-			
-			
-			
-
-
 
 			if ratio > args.threshold_ratio:
 				pixel_coordinates.append([x_low, x_high, y_low, y_high]) # DEBUG
-				regions.append([x + x0, y + y0])
+				x_shift = (coarse_w - fine_w) / 2
+				y_shift = (coarse_h - fine_h) / 2
+				regions.append([x + x0 - x_shift, y + y0 - y_shift])
+				# code.interact(local=locals())
 
 			y += fine_h
 		y = 0
@@ -535,7 +537,7 @@ if __name__ == '__main__':
 
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
-	interp = calibrateFocus(microscope, args, debug=False)
+	#interp = calibrateFocus(microscope, args, debug=False)
 
 	fine_progress = ProgressBar("Fine Scan", 18, len(regions_of_interest), 1, ea=20)
 
