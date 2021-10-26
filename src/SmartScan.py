@@ -86,7 +86,7 @@ def calibrateFocus(microscope, args, gfit=False, debug=False):
 		print("Please ensure that the sample is flat and level.")
 		exit()
 
-	return interp
+	return interp, res[0], res[1]
 
 def getRegionsOfInterest(img, args, x0, y0):
 	fine_zoom,   fine_w,   fine_h,   fine_exposure   = args.fine_zoom
@@ -419,7 +419,7 @@ if __name__ == '__main__':
 	# Now we perform the focus calibration for the coarse scan. 
 	microscope.camera.setExposure(coarse_exposure)
 	microscope.focus.setZoom(coarse_zoom)
-	interp = calibrateFocus(microscope, args, debug=False, gfit=False)
+	interp, mx, my = calibrateFocus(microscope, args, debug=False, gfit=False)
 
 	def avgimg(n, ds):
 		imgs = []
@@ -436,19 +436,11 @@ if __name__ == '__main__':
 
 	coarse_background = calculateBackgroundGreyscale(args, interp, microscope)
 
-	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
-	# not the region warrants further inspection.
-	coarse_progress = ProgressBar("Coarse Scan", 18, n_coarse_images, 1, ea=20)
-
-	regions_of_interest  = []
+	
 	image_number         = 0
 	x_current, y_current = x_min, y_min
 
-	microscope.stage.moveTo(x_current, y_current)
-	microscope.focus.setFocus(
-		interp((x_current, y_current)),
-		corrected=True
-	)
+	
 
 	# Here we figure out if the scan area is larger on the x or y axis. We can make the scan faster
 	# if the inner most loop goes over the largest axis.
@@ -476,9 +468,59 @@ if __name__ == '__main__':
 		inner_max     = y_max
 		inner_width   = coarse_h
 
+	# The focus motor performs better when it steps down across the sample instead of up. Here
+	# we'll determine the slope of the sample in the chosen inner sweep direction and make sure
+	# to move in the direction with a downward slope.
+	sign = 1.0
+	if swap:
+		# inner sweep direction is along the x-axis
+		if mx < 0:
+			print("Sample slopes upwards, reversing direction.")
+			# The focus moves upwards in the positive x-direction, we need to move in the opposite
+			# direction.
+			outer_reset   = x_max
+			sign          = -1.0
+			inner_current = x_max
+			def inner_condition():
+				return inner_current > x_min
+		else:
+			def inner_condition():
+				return inner_current < inner_max + inner_width
+	else:
+		if my < 0:
+			print("Sample slopes upwards, reversing direction.")
+			outer_reset   = y_max
+			sign          = -1.0
+			inner_current = y_max
+			def inner_condition():
+				return inner_current > y_min
+		else:
+			def inner_condition():
+				return inner_current < inner_max + inner_width
+				
+
+	if swap:
+		microscope.stage.moveTo(inner_current, outer_current)
+		microscope.focus.setFocus(
+			interp((inner_current, outer_current)), 
+			corrected=True
+		)
+	else:
+		microscope.stage.moveTo(outer_current, inner_current)
+		microscope.focus.setFocus(
+			interp((outer_current, inner_current)), 
+			corrected=True
+		)
+
+	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
+	# not the region warrants further inspection.
+	coarse_progress = ProgressBar("Coarse Scan", 18, n_coarse_images, 1, ea=20)
+
+	regions_of_interest  = []
 
 	while outer_current < outer_max + outer_width:
-		while inner_current < inner_max + inner_width:
+		row_regions_of_interest = []
+		while inner_condition():
 			x, y = microscope.stage.getPosition()
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
 			pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
@@ -488,9 +530,9 @@ if __name__ == '__main__':
 			
 			# This function will return the coordinates of all of the regions within this image that
 			# contain potentially interesting flakes.
-			regions_of_interest.extend(getRegionsOfInterest(img, args, x, y))
+			row_regions_of_interest.extend(getRegionsOfInterest(img, args, x, y))
 
-			inner_current += inner_width
+			inner_current += sign*inner_width
 			if swap:
 				microscope.stage.moveTo(inner_current, outer_current)
 				microscope.focus.setFocus(
@@ -505,19 +547,21 @@ if __name__ == '__main__':
 				)
 			image_number += 1
 			coarse_progress.update(image_number)
+
+		regions_of_interest.append(row_regions_of_interest)
 		inner_current  = outer_reset
 		outer_current += outer_width
 		if swap:
 			microscope.stage.moveTo(inner_current, outer_current)
 			microscope.focus.setFocus(
 				interp((inner_current, outer_current)),
-				corrected=args.quality_focus
+				corrected=True
 			)
 		else:
 			microscope.stage.moveTo(outer_current, inner_current)
 			microscope.focus.setFocus(
 				interp((outer_current, inner_current)),
-				corrected=args.quality_focus
+				corrected=True
 			)
 
 	coarse_progress.finish()
@@ -537,7 +581,7 @@ if __name__ == '__main__':
 
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
-	#interp = calibrateFocus(microscope, args, debug=False)
+	interp, mx, my = calibrateFocus(microscope, args, debug=False)
 
 	fine_progress = ProgressBar("Fine Scan", 18, len(regions_of_interest), 1, ea=20)
 
@@ -561,29 +605,36 @@ if __name__ == '__main__':
 	# fine_background = calculateBackgroundColored(args, interp, microscope).astype(np.float32)
 
 	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
-	for idx, (x, y) in enumerate(regions_of_interest):
-		microscope.stage.moveTo(x, y)
+	for row in regions_of_interest:
+		x0, y0 = row[0]
+		microscope.stage.moveTo(x0, y0)
 		microscope.focus.setFocus(
-			interp((x, y)),
-			corrected=args.quality_focus
+			interp((x0, y0)),
+			corrected=True
 		)
-		#code.interact(local=locals())
-		# Turning off background subtraction for now. It isn't necessary.
-		img = avgimg(args.fine_averages) # .astype(np.float32)
-		# img = img - fine_background
-		# img_min, img_max = img.min(), img.max()
-		# img = (((img - img_min) / (img_min - img_max)) * 255).astype(np.uint8)
+		for idx, (x, y) in enumerate(row):
+			microscope.stage.moveTo(x, y)
+			microscope.focus.setFocus(
+				interp((x, y)),
+				corrected=args.quality_focus
+			)
+			#code.interact(local=locals())
+			# Turning off background subtraction for now. It isn't necessary.
+			img = avgimg(args.fine_averages) # .astype(np.float32)
+			# img = img - fine_background
+			# img_min, img_max = img.min(), img.max()
+			# img = (((img - img_min) / (img_min - img_max)) * 255).astype(np.uint8)
 
-		#code.interact(local=locals())
+			#code.interact(local=locals())
 
-		filename = os.path.join(
-			args.output_directory,
-			"%04d_%2.4f_%2.4f.png"%(idx, x, y)
-		)
+			filename = os.path.join(
+				args.output_directory,
+				"%04d_%2.4f_%2.4f.png"%(idx, x, y)
+			)
 
-		# cv2.imwrite(filename, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-		cv2.imwrite(filename, img)
+			# cv2.imwrite(filename, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+			cv2.imwrite(filename, img)
 
-		fine_progress.update(idx + 1)
+			fine_progress.update(idx + 1)
 
 	fine_progress.finish()
