@@ -414,6 +414,7 @@ if __name__ == '__main__':
 	# Connect to the microscope hardware.
 	microscope = MicroscopeController(verbose=True)
 	microscope.camera.startCapture()
+	microscope.stage.setAcceleration(10, 10)
 	microscope.stage.setMaxSpeed(7.5, 7.5)
 
 	# Now we perform the focus calibration for the coarse scan. 
@@ -566,24 +567,13 @@ if __name__ == '__main__':
 
 	coarse_progress.finish()
 
-	# Plot every region that was identified as interesting.
-	x_vals = [i[0] for i in regions_of_interest]
-	y_vals = [i[1] for i in regions_of_interest]
-
-	fig, ax = plt.subplots(1, 1)
-	ax.scatter(x_vals, y_vals, s=1)
-	plt.show()
-	# for x, y in regions_of_interest:
-	# 	rect = patches.Rectangle(
-	# 		(50, 100), 40, 30, linewidth=1, edgecolor='r', facecolor='none'
-	# 	)
-
-
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
 	interp, mx, my = calibrateFocus(microscope, args, debug=False)
 
-	fine_progress = ProgressBar("Fine Scan", 18, len(regions_of_interest), 1, ea=20)
+	total_images = sum([len(i) for i in regions_of_interest])
+
+	fine_progress = ProgressBar("Fine Scan", 18, total_images, 1, ea=20)
 
 	def avgimg(n):
 		images = []
@@ -604,6 +594,9 @@ if __name__ == '__main__':
 	# Turning off background subtraction.
 	# fine_background = calculateBackgroundColored(args, interp, microscope).astype(np.float32)
 
+	meta_data['image_files'] = []
+
+	image_idx = 0
 	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
 	for row in regions_of_interest:
 		x0, y0 = row[0]
@@ -612,7 +605,7 @@ if __name__ == '__main__':
 			interp((x0, y0)),
 			corrected=True
 		)
-		for idx, (x, y) in enumerate(row):
+		for x, y in row:
 			microscope.stage.moveTo(x, y)
 			microscope.focus.setFocus(
 				interp((x, y)),
@@ -626,15 +619,29 @@ if __name__ == '__main__':
 			# img = (((img - img_min) / (img_min - img_max)) * 255).astype(np.uint8)
 
 			#code.interact(local=locals())
+			fstr = "%04d_%2.4f_%2.4f.png"%(image_idx, x, y)
+			meta_data['image_files'].append({
+				'path'     : fstr,
+				'position' : [x, y]	
+			})
 
 			filename = os.path.join(
 				args.output_directory,
-				"%04d_%2.4f_%2.4f.png"%(idx, x, y)
+				fstr
 			)
 
 			# cv2.imwrite(filename, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 			cv2.imwrite(filename, img)
+			image_idx += 1
 
-			fine_progress.update(idx + 1)
+			fine_progress.update(image_idx + 1)
 
 	fine_progress.finish()
+
+	meta_data['end_time'] = str(datetime.now())
+
+	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
+		file.write(json.dumps(meta_data))
+
+	microscope.camera.endCapture()
+	cv2.destroyAllWindows()

@@ -45,7 +45,7 @@
 			"spec"  : {
 				"dest"     : "fine_averages",
 				"type"     : "int",
-				"default"  : 6,
+				"default"  : 3,
 				"help"     : "The number of images to average together when taking zoomed in images."
 			}
 		},
@@ -64,7 +64,7 @@
 			"spec"  : {
 				"dest"     : "coarse_averages",
 				"type"     : "int",
-				"default"  : 3,
+				"default"  : 1,
 				"help"     : "The number of images to average together when taking zoomed out images."
 			}
 		},
