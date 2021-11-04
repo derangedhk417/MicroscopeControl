@@ -179,6 +179,9 @@ class ModelTrainer:
 				img = cv2.imread(imgPath, cv2.IMREAD_COLOR)
 				if self.useHsv:
 					img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+				if self.downscaleFactor != 1:
+					img = cv2.resize(img, (0, 0), fx=(1 / self.downscaleFactor), fy=(1 / self.downscaleFactor))
+					print("downscaling")
 				loadedImages.append(img)
 			except Exception as ex:
 				raise Exception("Unable to load image %s"%imageSpec['path']) from ex
@@ -211,6 +214,8 @@ class ModelTrainer:
 				img = (img - img.min()) / (img.max() - img.min())
 				contrastImages.append(img)
 			else:
+				if self.bilateralSettings != [] and self.bilateralSettings != [0, 0, 0]:
+					img = cv2.bilateralFilter(img, *self.bilateralSettings)
 				contrastImages.append(self.getContrast(img))
 
 		if self.verbose:
@@ -245,7 +250,7 @@ class ModelTrainer:
 			# If verbose == True, show the image alongside what each pixel was
 			# categorized as.
 			if self.verbose:
-				fig, (ax1, ax2) = plt.subplots(2, 1)
+				fig, (ax1, ax2) = plt.subplots(1, 2)
 				ax1.imshow(cimg)
 
 				colored_img = cimg.copy().astype(np.uint8)
@@ -277,7 +282,7 @@ class ModelTrainer:
 
 
 
-def getImgContrast(img, threshold=0.05):
+def getImgContrast(img, threshold=0.01):
 	img = cv2.medianBlur(img, 3)
 	#img = cv2.bilateralFilter(img, 5, 20, 80)
 	# img = cv2.fastNlMeansDenoisingColored(
@@ -300,14 +305,14 @@ def getImgContrast(img, threshold=0.05):
 	G = G.astype(np.float32)
 	B = B.astype(np.float32)
 
-	R_con = (R - R_mode) / R_mode
-	G_con = (G - G_mode) / G_mode
-	B_con = (B - B_mode) / B_mode
+	R_con = (R_mode - R) / R_mode
+	G_con = (G_mode - G) / G_mode
+	B_con = (B_mode - B) / B_mode
 
 	# Set everything less than the threshold value to zero.
-	R_con[R_con < threshold] = 0
-	G_con[G_con < threshold] = 0
-	B_con[B_con < threshold] = 0
+	# R_con[R_con < threshold] = 0
+	# G_con[G_con < threshold] = 0
+	# B_con[B_con < threshold] = 0
 
 	# Return the contrast image.
 	return np.stack([R_con, G_con, B_con], axis=2)

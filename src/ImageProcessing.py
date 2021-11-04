@@ -164,7 +164,8 @@ class ImageProcessor:
 				plt.imshow(img)
 				plt.title("Before Bilateral Filter")
 				plt.show()
-			img = cv2.bilateralFilter(img, 5, *self.bilateral_filter)
+			for i in range(10):
+				img = cv2.bilateralFilter(img, 5, *self.bilateral_filter)
 			if self.debug:
 				plt.imshow(img)
 				plt.title("After Bilateral Filter")
@@ -239,11 +240,12 @@ class ImageProcessor:
 		# Return the contrast image.
 		return result
 
-	def processImage(self, img):
+	def processImage(self, img, bg):
 		self.img_path = img
 		# If the supplied image is a string then we load it. Otherwise, if it's an ndarray we
 		# assume it's already properly loaded in BGR format.
 		img = cv2.imread(img)
+		img = img - bg
 
 		if self.downscale_factor != 1:
 			# Downscale the image before processing.
@@ -276,7 +278,9 @@ class ImageProcessor:
 			contrast_img, calc_disagreement=False
 		)
 
-		code.interact(local=locals())
+		# code.interact(local=locals())
+		plt.imshow(layers)
+		plt.show()
 
 		# Now that we have the layer data, we use it to create a mask where 1 corresponds to flake
 		# and 0 corresponds to background. We'll use this to contour each flake. This information
@@ -330,6 +334,8 @@ class ImageProcessor:
 			entries.append(entry)
 			# TODO: Calculate quality statistics like the continuity of regions. Number of holes,
 			# concavity, etc.
+
+		
 
 
 		# We now have pretty much all of the useful raw data we can get from the image. The next
@@ -561,6 +567,62 @@ def processFile(img, fname, args):
 	p.processImage(fname)
 	return True, None
 
+def calculateBackgroundColored(images):
+	imgs_r_arr = [i[:, :, 2] for i in images]
+	imgs_g_arr = [i[:, :, 1] for i in images]
+	imgs_b_arr = [i[:, :, 0] for i in images]
+	imgs_r = np.stack(imgs_r_arr, axis=2)
+	imgs_g = np.stack(imgs_g_arr, axis=2)
+	imgs_b = np.stack(imgs_b_arr, axis=2)
+	means_r = imgs_r.mean(axis=2)
+	means_g = imgs_g.mean(axis=2)
+	means_b = imgs_b.mean(axis=2)
+	stds_r  = imgs_r.std(axis=2)
+	stds_g  = imgs_g.std(axis=2)
+	stds_b  = imgs_b.std(axis=2)
+
+	weights_r = []
+	weights_g = []
+	weights_b = []
+	for img_r, img_g, img_b in zip(imgs_r_arr, imgs_g_arr, imgs_b_arr):
+		mask_r       = np.abs(img_r - means_r) < 1.2 * stds_r
+		mask_g       = np.abs(img_g - means_g) < 1.2 * stds_g
+		mask_b       = np.abs(img_b - means_b) < 1.2 * stds_b
+
+		weight_r       = np.ones(mask_r.shape) * 0.001
+		weight_r[mask_r] = 1.0
+		weights_r.append(weight_r) 
+
+		weight_g       = np.ones(mask_g.shape) * 0.001
+		weight_g[mask_g] = 1.0
+		weights_g.append(weight_g) 
+
+		weight_b       = np.ones(mask_b.shape) * 0.001
+		weight_b[mask_b] = 1.0
+		weights_b.append(weight_b) 
+
+	weights_r  = np.stack(weights_r, axis=2)
+	background_r = np.average(imgs_r, axis=2, weights=weights_r)
+
+	weights_g  = np.stack(weights_g, axis=2)
+	background_g = np.average(imgs_g, axis=2, weights=weights_g)
+
+	weights_b  = np.stack(weights_b, axis=2)
+	background_b = np.average(imgs_b, axis=2, weights=weights_b)
+
+	background = np.stack([background_b, background_g, background_r], axis=2).astype(np.uint8)
+
+	background = background - background.min()
+
+	#code.interact(local=locals())
+
+	fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+	ax1.imshow(images[0])
+	ax2.imshow(background)
+	ax3.imshow(images[0] - background)
+	plt.show()
+	return background
+
 if __name__ == '__main__':
 	# p = ImageProcessor(
 	# 	"_graphene_on_pdms.json", 
@@ -595,18 +657,27 @@ if __name__ == '__main__':
 	# 	output_path="pdms_001_graphene_scan_003"
 	# )
 	# p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")
+	fnames = [
+		"0009.png", "0013.png", "0025.png", "0060.png",
+		"0091.png", "0098.png", "0123.png", "0142.png"
+	]
+	imgs = [cv2.imread("test/" + f) for f in fnames]
+
+	bg = calculateBackgroundColored(imgs)
 
 	p = ImageProcessor(
-		"_graphene_on_SiO2_Silicon.json", 
+		"_graphene_on_90nmSiO2_Silicon.json", 
 		invert_contrast=False,
 		median_blur=False,
-		sharpen=True,
+		sharpen=False,
+		bilateral_filter=[10, 50],
 		denoise=0,
-		erode=3,
-		dilate=3,
+		erode=0,
+		dilate=0,
 		debug=True,
 		downscale_factor=2,
-		output_path="pdms_001_graphene_scan_003",
-		skip_channel='b'
+		output_path="test",
+		skip_channel='b',
+		nearest=False
 	)
-	p.processImage("test/000074_-4.85180_1.85250.png")
+	p.processImage("test/0386.png", bg)
