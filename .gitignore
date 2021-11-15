@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 data/*
+src/data/*
 *test*
 *110_sq_mm_scan_graphene_sio2*
 
