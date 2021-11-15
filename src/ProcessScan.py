@@ -68,9 +68,52 @@ def getFilesSince(directory, timestamp):
 	return results
 
 
+# I know, weird name, but it does accurately and somewhat concisely describe what this code
+# does.
+class MultiProcessImageProcessor:
+	def __init__(self, n_processes=8):
+		self.n_processes  = n_processes
+		self.pool         = Pool(args.n_processes)
+
+		self.current_in_process = 0
+		self.total_processed    = 0
+		self.idx                = 0
+		self.results            = []
+		self.failures           = []
+
+	def addItem(self, item, bg,args=None):
+		res = self.pool.apply_async(processFile, (None, item, args))
+		self.results.append(res)
+		self.idx                += 1
+		self.current_in_process += 1
+
+	def waitForCompletion(self):
+		pb = ProgressBar("Processing Images", 18, self.current_in_process, 1, ea=25)
+		processed = 0
+		while self.current_in_process > 0:
+			done = []
+			for r in self.results:
+				if r.ready():
+					status, fname            = r.get(0.01)
+					self.total_processed    += 1
+					self.current_in_process -= 1
+					
+					processed += 1
+					pb.update(processed)
+					done.append(r)
+
+					if not status:
+						self.failures.append(fname)
+
+			for d in done:
+				self.results.remove(d)
+
+			time.sleep(0.001)
+		pb.finish()
+
 if __name__ == '__main__':
 	# Load the arguments file. 
-	with open("ScanProcessing.json", 'r') as file:
+	with open("_ProcessScan.json", 'r') as file:
 		args_specification = json.loads(file.read())
 	args  = preprocess(args_specification)
 

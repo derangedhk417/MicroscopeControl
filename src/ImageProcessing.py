@@ -36,6 +36,11 @@ class ImageProcessor:
 
 		self._createGaussianScoringFunctions()
 
+		if 'background' in kwargs:
+			self.background = kwargs['background']
+		else:
+			self.background = None
+
 		if 'output_path' in kwargs:
 			self.output_path = kwargs['output_path']
 		else:
@@ -185,21 +190,29 @@ class ImageProcessor:
 			elif self.skip_channel == 'b':
 				B = R.copy()
 
-		def getMode(channel):
-			return np.argmax(np.bincount(channel.flatten()))
+		if self.background is not None:
+			R_bg = self.background[:, :, 2]
+			G_bg = self.background[:, :, 1]
+			B_bg = self.background[:, :, 0]
+			R_con = (R_bg - R) / R_bg
+			G_con = (G_bg - G) / G_bg
+			B_con = (B_bg - B) / B_bg
+		else:
+			def getMode(channel):
+				return np.argmax(np.bincount(channel.flatten()))
 
-		R_mode = max(getMode(R), 1)
-		G_mode = max(getMode(G), 1)
-		B_mode = max(getMode(B), 1)
+			R_mode = max(getMode(R), 1)
+			G_mode = max(getMode(G), 1)
+			B_mode = max(getMode(B), 1)
 
-		# Now we convert to floating point for the contrast calculation.
-		R = R.astype(np.float32)
-		G = G.astype(np.float32)
-		B = B.astype(np.float32)
+			# Now we convert to floating point for the contrast calculation.
+			R = R.astype(np.float32)
+			G = G.astype(np.float32)
+			B = B.astype(np.float32)
 
-		R_con = -(R - R_mode) / R_mode
-		G_con = -(G - G_mode) / G_mode
-		B_con = -(B - B_mode) / B_mode
+			R_con = -(R - R_mode) / R_mode
+			G_con = -(G - G_mode) / G_mode
+			B_con = -(B - B_mode) / B_mode
 
 		if self.invert_contrast:
 			R_con = -R_con
@@ -245,7 +258,6 @@ class ImageProcessor:
 		# If the supplied image is a string then we load it. Otherwise, if it's an ndarray we
 		# assume it's already properly loaded in BGR format.
 		img = cv2.imread(img)
-		img = img - bg
 
 		if self.downscale_factor != 1:
 			# Downscale the image before processing.
@@ -549,20 +561,21 @@ class ImageProcessor:
 
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
-def processFile(img, fname, args):
+def processFile(img, fname, bg, args):
 	p = ImageProcessor(
 		args.material_file,
 		invert_contrast=args.invert_contrast,
 		median_blur=False,
-		sharpen=True,
+		bilateral_filter=[10, 50],
+		background=bg,
+		sharpen=False,
 		denoise=0,
-		erode=3,
-		dilate=3,
-		downscale_factor=args.downscale,
+		erode=0,
+		dilate=0,
+		nearest=False,
+		downscale_factor=2,
 		debug=False,
 		output_path=args.output_directory,
-		image_dims=[args.image_height, args.image_width],
-		skip_channel=args.skip_channel
 	)
 	p.processImage(fname)
 	return True, None
@@ -612,10 +625,6 @@ def calculateBackgroundColored(images):
 
 	background = np.stack([background_b, background_g, background_r], axis=2).astype(np.uint8)
 
-	background = background - background.min()
-
-	#code.interact(local=locals())
-
 	fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 	ax1.imshow(images[0])
 	ax2.imshow(background)
@@ -661,7 +670,7 @@ if __name__ == '__main__':
 		"0009.png", "0013.png", "0025.png", "0060.png",
 		"0091.png", "0098.png", "0123.png", "0142.png"
 	]
-	imgs = [cv2.imread("test/" + f) for f in fnames]
+	imgs = [cv2.imread("data/test/" + f) for f in fnames]
 
 	bg = calculateBackgroundColored(imgs)
 
@@ -669,6 +678,7 @@ if __name__ == '__main__':
 		"_graphene_on_90nmSiO2_Silicon.json", 
 		invert_contrast=False,
 		median_blur=False,
+		background=bg,
 		sharpen=False,
 		bilateral_filter=[10, 50],
 		denoise=0,
@@ -680,4 +690,4 @@ if __name__ == '__main__':
 		skip_channel='b',
 		nearest=False
 	)
-	p.processImage("test/0386.png", bg)
+	p.processImage("test/0386.png")
