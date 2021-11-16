@@ -130,90 +130,20 @@ class ImageProcessor:
 		self.gaussianScoringFunctions = [r, g, b]
 
 	def getContrastImg(self, img):
-		if self.denoise != 0:
-			if self.debug:
-				plt.imshow(img)
-				plt.title("Before Denoise")
-				plt.show()
-			img = cv2.fastNlMeansDenoisingColored(
-				img, 
-				self.denoise, 
-				self.denoise
-			)
-			if self.debug:
-				plt.imshow(img)
-				plt.title("After Denoise")
-				plt.show()
-
-		if self.sharpen:
-			if self.debug:
-				plt.imshow(img)
-				plt.title("Before Sharpen")
-				plt.show()
-			sharpen_kernel = np.array([
-				[-1, -1, -1], 
-				[-1, 9,  -1], 
-				[-1, -1, -1]
-			])
-			img = cv2.filter2D(img, -1, sharpen_kernel)
-			if self.debug:
-				plt.imshow(img)
-				plt.title("After Sharpen")
-				plt.show()
-
-		if self.median_blur:
-			img = cv2.medianBlur(img, 3)
-
-		if self.bilateral_filter is not None:
-			if self.debug:
-				plt.imshow(img)
-				plt.title("Before Bilateral Filter")
-				plt.show()
-			for i in range(10):
-				img = cv2.bilateralFilter(img, 5, *self.bilateral_filter)
-			if self.debug:
-				plt.imshow(img)
-				plt.title("After Bilateral Filter")
-				plt.show()
-
+		for i in range(10):
+			img = cv2.bilateralFilter(img, 5, *self.bilateral_filter)
+			
 
 		# Separate the channels.
 		B, G, R = img[:, :, 0], img[:, :, 1], img[:, :, 2]
 
-		# At this step, if the user specified that they don't want a certain channel processed, 
-		# we'll duplicate another channel into it so that it won't interfere with calculations.
-		if self.skip_channel is not None:
-			if self.skip_channel == 'r':
-				R = B.copy()
-			elif self.skip_channel == 'g':
-				G = R.copy()
-			elif self.skip_channel == 'b':
-				B = R.copy()
-
-		if self.background is not None:
-			R_bg = self.background[:, :, 2]
-			G_bg = self.background[:, :, 1]
-			B_bg = self.background[:, :, 0]
-			R_con = (R_bg - R) / R_bg
-			G_con = (G_bg - G) / G_bg
-			B_con = (B_bg - B) / B_bg
-		else:
-			def getMode(channel):
-				return np.argmax(np.bincount(channel.flatten()))
-
-			R_mode = max(getMode(R), 1)
-			G_mode = max(getMode(G), 1)
-			B_mode = max(getMode(B), 1)
-
-			# Now we convert to floating point for the contrast calculation.
-			R = R.astype(np.float32)
-			G = G.astype(np.float32)
-			B = B.astype(np.float32)
-
-			R_con = -(R - R_mode) / R_mode
-			G_con = -(G - G_mode) / G_mode
-			B_con = -(B - B_mode) / B_mode
-
+		R_bg = self.background[:, :, 2]
+		G_bg = self.background[:, :, 1]
+		B_bg = self.background[:, :, 0]
+		R_con = (R_bg - R) / R_bg
+		G_con = (G_bg - G) / G_bg
+		B_con = (B_bg - B) / B_bg
+		
 		if self.invert_contrast:
 			R_con = -R_con
 			G_con = -G_con
@@ -225,30 +155,6 @@ class ImageProcessor:
 		B_con[B_con < self.thresholds['b']] = 0
 
 		result = np.stack([R_con, G_con, B_con], axis=2)
-
-		if self.erode != 0:
-			if self.debug:
-				plt.imshow(result)
-				plt.title("Before Erode Filter")
-				plt.show()
-			kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.erode, self.erode))
-			result    = cv2.erode(result, kernel)
-			if self.debug:
-				plt.imshow(result)
-				plt.title("After Erode Filter")
-				plt.show()
-
-		if self.dilate != 0:
-			if self.debug:
-				plt.imshow(result)
-				plt.title("Before Dilate Filter")
-				plt.show()
-			kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilate, self.dilate))
-			result    = cv2.dilate(result, kernel)
-			if self.debug:
-				plt.imshow(result)
-				plt.title("After Dilate Filter")
-				plt.show()
 
 		# Return the contrast image.
 		return result
@@ -563,21 +469,17 @@ class ImageProcessor:
 
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
-def processFile(img, fname, bg, args):
+def processFile(fname, bg, image_dims, args):
 	p = ImageProcessor(
 		args.material_file,
 		invert_contrast=args.invert_contrast,
-		median_blur=False,
 		bilateral_filter=[10, 50],
 		background=bg,
-		sharpen=False,
-		denoise=0,
-		erode=0,
-		dilate=0,
 		nearest=False,
 		downscale_factor=2,
 		debug=False,
 		output_path=args.output_directory,
+		image_dims=image_dims
 	)
 	files = p.processImage(fname)
 	return True, [fname, files]
@@ -635,39 +537,6 @@ def calculateBackgroundColored(images):
 	return background
 
 if __name__ == '__main__':
-	# p = ImageProcessor(
-	# 	"_graphene_on_pdms.json", 
-	# 	invert_contrast=False,
-	# 	median_blur=True,
-	# 	downscale_factor=4
-	# )
-	# p.processImage("test/000019_-6.02260_0.54630.png")
-
-	# KEEP THIS, IT SEEMS TO WORK WELL
-	# p = ImageProcessor(
-	# 	"_graphene.json", 
-	# 	invert_contrast=False,
-	# 	median_blur=False,
-	# 	sharpen=True,
-	# 	bilateral_filter=(50, 50),
-	# 	denoise=15
-	# )
-	# p.processImage("test/Image2.png")
-
-	# KEEP THIS, IT SEEMS TO WORK WELL
-	# p = ImageProcessor(
-	# 	"_graphene_on_pdms.json", 
-	# 	invert_contrast=True,
-	# 	median_blur=False,
-	# 	sharpen=True,
-	# 	denoise=0,
-	# 	erode=3,
-	# 	dilate=3,
-	# 	debug=True,
-	# 	downscale_factor=4,
-	# 	output_path="pdms_001_graphene_scan_003"
-	# )
-	# p.processImage("pdms_001_graphene_scan_003/000003_-6.41290_0.87290.png")
 	fnames = [
 		"0009.png", "0013.png", "0025.png", "0060.png",
 		"0091.png", "0098.png", "0123.png", "0142.png"
@@ -679,17 +548,11 @@ if __name__ == '__main__':
 	p = ImageProcessor(
 		"_graphene_on_90nmSiO2_Silicon.json", 
 		invert_contrast=False,
-		median_blur=False,
 		background=bg,
-		sharpen=False,
 		bilateral_filter=[10, 50],
-		denoise=0,
-		erode=0,
-		dilate=0,
 		debug=True,
 		downscale_factor=2,
 		output_path="test",
-		skip_channel='b',
 		nearest=False
 	)
 	p.processImage("test/0386.png")

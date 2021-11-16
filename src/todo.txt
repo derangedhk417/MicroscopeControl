@@ -1,2 +1,3 @@
+- Cleanup image processing code.
 - Move the monolayer contrast calculator code into this repository.
 - Implement proper generation of optical parameter files.

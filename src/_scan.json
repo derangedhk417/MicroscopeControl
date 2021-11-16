@@ -13,7 +13,7 @@
 		{
 			"names" : ["-op", "--optical-parameters"],
 			"spec"  : {
-				"dest"     : "optical_parameters",
+				"dest"     : "material_file",
 				"type"     : "str",
 				"default"  : null,
 				"help"     : "A file containing information about the expected optical contrast of the material being imaged. If this file is not specified, the images taken by this program will not be processed and you'll have to run the processing code separately. See calibration_data/_graphene_on_90nmSiO2_Silicon.json for an example of what this file should look like. These files can be generated with the MonolayerContrastCalculator program (in a separate repository)."

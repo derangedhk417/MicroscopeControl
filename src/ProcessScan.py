@@ -49,11 +49,12 @@ def preprocess(args_specification):
 # I know, weird name, but it does accurately and somewhat concisely describe what this code
 # does.
 class MultiProcessImageProcessor:
-	def __init__(self, n_processes=8, metadata=None):
+	def __init__(self, image_dims, n_processes=8, metadata=None):
 		self.n_processes  = n_processes
 		self.pool         = Pool(args.n_processes)
 		self.metadata     = metadata
 
+		self.image_dims         = image_dims
 		self.current_in_process = 0
 		self.total_processed    = 0
 		self.results            = []
@@ -64,8 +65,8 @@ class MultiProcessImageProcessor:
 			'files'     : {}
 		}
 
-	def addItem(self, item, bg,args=None):
-		res = self.pool.apply_async(processFile, (None, item, args))
+	def addItem(self, item, bg, args):
+		res = self.pool.apply_async(processFile, (None, item, bg, self.image_dims, args))
 		self.results.append(res)
 		self.current_in_process += 1
 
@@ -169,7 +170,7 @@ if __name__ == '__main__':
 		args.n_processes
 	))
 
-	imageProcessor = MultiProcessImageProcessor(args.n_processes, metadata)
+	imageProcessor = MultiProcessImageProcessor(args.image_dims, args.n_processes, metadata)
 	
 	for file in files:
 		imageProcessor.addItem(file, bg_image, args)

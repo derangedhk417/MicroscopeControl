@@ -382,13 +382,13 @@ def validateArgs(args):
 			raise Exception("Argument '%s' is missing."%c)
 
 	if isNoneOrMissing(args_file, "contrast_range"):
-		# Layer range must be specified and if it is, optical_parameters must also be specified.
+		# Layer range must be specified and if it is, material_file must also be specified.
 		if isNoneOrMissing(args_file, "layer_range"):
 			raise Exception("contrast_range and layer_range parameter missing. " + _
 				"You must specify at least one.")
 		else:
-			if isNoneOrMissing(args_file, "optical_parameters"):
-				raise Exception("layer_range was specified but optical_parameters was not.")
+			if isNoneOrMissing(args_file, "material_file"):
+				raise Exception("layer_range was specified but material_file was not.")
 
 	return type("arg_dictionary", (object,), args_file)
 
@@ -414,14 +414,14 @@ if __name__ == '__main__':
 	meta_data['processed_arguments'] = args.__dict__
 
 	if args.layer_range is not None:
-		with open(args.optical_parameters, 'r') as file:
-			optical_parameters = json.loads(file.read())
+		with open(args.material_file, 'r') as file:
+			material_file = json.loads(file.read())
 
 		# We need to iterate over the "layers" member of this file and find the values corresponding
 		# to the layer numbers specified by the user. Next we need to calculate how the RGB contrast
 		# values should appear in a greyscale image. This is based on the way openCV converts 
 		# RGB images to greyscale.
-		layers = optical_parameters['layers']
+		layers = material_file['layers']
 		temp   = []
 		for l in layers:
 			temp.append(
@@ -451,9 +451,13 @@ if __name__ == '__main__':
 
 
 	process_images = False
-	if args.optical_parameters is not None:
+	if args.material_file is not None:
 		process_images = True
-		imageProcessor = MultiProcessImageProcessor(args.n_processes, meta_data)
+		imageProcessor = MultiProcessImageProcessor(
+			[args.fine_zoom[2], args.fine_zoom[1]], 
+			args.n_processes, 
+			meta_data
+		)
 
 	#############################################
 	# Scan Setup
