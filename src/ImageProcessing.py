@@ -367,6 +367,8 @@ class ImageProcessor:
 		with open(stats_path, 'w') as file:
 			file.write(json.dumps({"flakes": entries}))
 
+		return [geometry_path, layers_path, stats_path]
+
 	def subimage(self, image, rect):
 		border_size = int(image.shape[0] / 2)
 		image = cv2.copyMakeBorder(
@@ -577,8 +579,8 @@ def processFile(img, fname, bg, args):
 		debug=False,
 		output_path=args.output_directory,
 	)
-	p.processImage(fname)
-	return True, None
+	files = p.processImage(fname)
+	return True, [fname, files]
 
 def calculateBackgroundColored(images):
 	imgs_r_arr = [i[:, :, 2] for i in images]

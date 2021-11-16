@@ -96,9 +96,10 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 	fine_zoom,   fine_w,   fine_h,   fine_exposure   = args.fine_zoom
 	coarse_zoom, coarse_w, coarse_h, coarse_exposure = args.coarse_zoom
 
-	pv = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
-	cv2.imshow('Scan Preview', pv)
-	cv2.waitKey(1)
+	if args.preview:
+		pv = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
+		cv2.imshow('Scan Preview', pv)
+		cv2.waitKey(1)
 
 	# Originally, this code tried to guess a uniform background by finding the most common pixel
 	# value. The current version of this code does not subtract a background before processing the
@@ -107,7 +108,6 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 
 	img        = img.astype(np.float32)
 	contrast   = (bg - img) / bg
-
 
 	mm_per_pixel_x = coarse_w / contrast.shape[1]
 	mm_per_pixel_y = coarse_h / contrast.shape[0]
@@ -158,26 +158,23 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 		y = 0
 		x += fine_w
 
-	# DEBUG
-	timg = contrast.copy()
-	rect_color = contrast.max() * 2
-	for rect in pixel_coordinates:
-		timg = cv2.rectangle(
-			timg, 
-			(rect[0], rect[2]), 
-			(rect[1], rect[3]), 
-			(rect_color, 0, 0), 
-			3
-		)
-	# plt.imshow(timg)
-	# plt.show()
-	_min = timg.min()
-	_max = timg.max()
-	timg  = (((timg - _min) / (_max - _min)) * 255).astype(np.uint8)
-	pv = cv2.resize(timg, (0, 0), fx=0.3, fy=0.3)
-	cv2.imshow('Scan Preview', pv)
-	cv2.waitKey(1)
-	# END DEBUG
+	if args.preview:
+		timg = contrast.copy()
+		rect_color = contrast.max() * 2
+		for rect in pixel_coordinates:
+			timg = cv2.rectangle(
+				timg, 
+				(rect[0], rect[2]), 
+				(rect[1], rect[3]), 
+				(rect_color, 0, 0), 
+				3
+			)
+		_min = timg.min()
+		_max = timg.max()
+		timg  = (((timg - _min) / (_max - _min)) * 255).astype(np.uint8)
+		pv = cv2.resize(timg, (0, 0), fx=0.3, fy=0.3)
+		cv2.imshow('Scan Preview', pv)
+		cv2.waitKey(1)
 
 	return regions
 
@@ -456,7 +453,7 @@ if __name__ == '__main__':
 	process_images = False
 	if args.optical_parameters is not None:
 		process_images = True
-		imageProcessor = MultiProcessImageProcessor(args.n_processes)
+		imageProcessor = MultiProcessImageProcessor(args.n_processes, meta_data)
 
 	#############################################
 	# Scan Setup
@@ -651,9 +648,10 @@ if __name__ == '__main__':
 		while inner_condition():
 			x, y = microscope.stage.getPosition()
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
-			pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
-			cv2.imshow('Scan Preview', pv)
-			cv2.waitKey(1)
+			if args.preview:
+				pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
+				cv2.imshow('Scan Preview', pv)
+				cv2.waitKey(1)
 			
 			# This function will return the coordinates of all of the regions within this image that
 			# contain potentially interesting flakes.
@@ -726,6 +724,7 @@ if __name__ == '__main__':
 	# Export the background to an image so the user can reference it later and so that the image
 	# processing code can use it if it is run after this scan is complete.
 	fine_bg_image_name = os.path.join(args.output_directory, "_fine_background.png")
+	meta_data['fine_background_file'] = fine_bg_image_name
 	cv2.imwrite(fine_bg_image_name, fine_background)
 
 	meta_data['image_files'] = []
@@ -784,7 +783,9 @@ if __name__ == '__main__':
 	meta_data['end_time'] = str(datetime.now())
 
 	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
-		file.write(json.dumps(meta_data))
+		file.write(json.dumps(imageProcessor.getMetaData()))
+
+	imageProcessor.buildDatabase()
 
 	microscope.camera.endCapture()
 	cv2.destroyAllWindows()

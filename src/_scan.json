@@ -125,6 +125,14 @@
 			}
 		},
 		{
+			"names" : ["-p", "--preview"],
+			"spec"  : {
+				"dest"     : "preview",
+				"action"   : "store_true",
+				"help"     : "Show a preview of the flake identification process during the coarse scan. Rendering this preview takes significant CPU resources and can cause a scan to run more slowly."
+			}
+		},
+		{
 			"names" : ["-tr", "--threshold-ratio"],
 			"spec"  : {
 				"dest"     : "threshold_ratio",

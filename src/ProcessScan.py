@@ -21,6 +21,7 @@ import json
 import shutil
 import numpy             as np
 import matplotlib.pyplot as plt
+import sqlite3           as sql
 
 from multiprocessing import Pool
 from ImageProcessing import processFile
@@ -45,58 +46,42 @@ def preprocess(args_specification):
 
 	return args
 
-def getFilesSince(directory, timestamp):
-	entries = os.listdir(directory)
-
-	results = []
-	for entry in entries:
-		try:
-			path = os.path.join(directory, entry)
-			ts   = os.path.getctime(path)
-			ms   = os.path.getmtime(path)
-			ts   = max(ms, ts)
-		except FileNotFoundError as ex:
-			# Its possible for a file to get deleted between the call
-			# to os.listdir and the calls to getctime and getmtime.
-			continue
-
-		if ts > timestamp:
-			ext = entry.split(".")[-1].lower()
-			if ext == 'png':
-				results.append(path)
-
-	return results
-
-
 # I know, weird name, but it does accurately and somewhat concisely describe what this code
 # does.
 class MultiProcessImageProcessor:
-	def __init__(self, n_processes=8):
+	def __init__(self, n_processes=8, metadata=None):
 		self.n_processes  = n_processes
 		self.pool         = Pool(args.n_processes)
+		self.metadata     = metadata
 
 		self.current_in_process = 0
 		self.total_processed    = 0
-		self.idx                = 0
 		self.results            = []
 		self.failures           = []
+
+		self.metadata['image_processing'] = {
+			'initiated' : str(datetime.now()),
+			'files'     : {}
+		}
 
 	def addItem(self, item, bg,args=None):
 		res = self.pool.apply_async(processFile, (None, item, args))
 		self.results.append(res)
-		self.idx                += 1
 		self.current_in_process += 1
+
 
 	def waitForCompletion(self):
 		pb = ProgressBar("Processing Images", 18, self.current_in_process, 1, ea=25)
 		processed = 0
 		while self.current_in_process > 0:
-			done = []
+			done          = []
 			for r in self.results:
 				if r.ready():
-					status, fname            = r.get(0.01)
+					status, files            = r.get(0.01)
 					self.total_processed    += 1
 					self.current_in_process -= 1
+
+					self.metadata['image_processing']['files'][files[0]] = files[1]
 					
 					processed += 1
 					pb.update(processed)
@@ -111,63 +96,89 @@ class MultiProcessImageProcessor:
 			time.sleep(0.001)
 		pb.finish()
 
+	def getMetaData(self):
+		return self.metadata
+
+	def buildDatabase(self, args):
+		print("Building database ... ", end='')
+		dbname = os.path.join(args.output_directory, "_database.db")
+		con    = sql.connect(dbname)
+		cur    = con.cursor()
+		path   = args.output_directory
+
+		layer_columns = ['L%03d_area REAL'%(i + 1) for i in range(args.n_layers_max)]
+		column_spec   = "(id INT PRIMARY KEY, file TEXT, geom_idx INT, area REAL, %s)"%(
+			", ".join(layer_columns)
+		)
+
+		cur.execute("CREATE TABLE flakes %s"%column_spec)
+
+		files = []
+		for entry in os.listdir(path):
+			file = entry.replace("\\", "/").split("/")[-1]
+			ext  = ".".join(file.split(".")[-2:])
+			if ext == "stats.json":
+				files.append(os.path.join(path, entry))
+
+		current_id = 0
+		for i, file in enumerate(files):
+			with open(file, 'r') as f:
+				data = json.loads(f.read())
+
+			for flake in data['flakes']:
+				columns       = "id, %s"%(", ".join(flake.keys()))
+				value_strings = []
+				for v in flake.values():
+					if type(v) is str:
+						value_strings.append("'%s'"%v)
+					else:
+						value_strings.append("%.2f"%float(v))
+
+				values    = "%d, %s"%(current_id, ", ".join(value_strings))
+				statement = "INSERT INTO flakes (%s) VALUES (%s)"%(columns, values)
+				cur.execute(statement)
+				current_id += 1
+
+			print("file %d / %d"%(i + 1, len(files)))
+
+		con.commit()
+		con.close()
+
+		print("Done")
+
+# When this program is run standalone we just want it to load all image files in the output
+# directory and process them.
 if __name__ == '__main__':
 	# Load the arguments file. 
 	with open("_ProcessScan.json", 'r') as file:
 		args_specification = json.loads(file.read())
 	args  = preprocess(args_specification)
 
-	files = getFilesSince(args.output_directory, 0)
+	# We need to load the background file for these images.
+	metadata_fname = os.path.join(args.output_directory, "_scan.json")
+	with open(metadata_fname, 'r') as file:
+		metadata = json.loads(file.read())
+
+	fine_bg_name = metadata['fine_background_file']
+	bg_image     = cv2.imread(fine_bg_name)
+
+	files = [entry['path'] for entry in metadata['image_files']]
 
 	print("Processing %d files using %d processes."%(
 		len(files), 
 		args.n_processes
 	))
+
+	imageProcessor = MultiProcessImageProcessor(args.n_processes, metadata)
 	
+	for file in files:
+		imageProcessor.addItem(file, bg_image, args)
 
-	pb = ProgressBar("Processing ", 11, len(files), 1, ea=25)
+	imageProcessor.waitForCompletion()
 
-	if args.n_processes > 1:
-		pool = Pool(args.n_processes)
+	metadata = imageProcessor.getMetaData()
 
-		current_in_process = 0
-		total_processed    = 0
-		idx                = 0
-		results            = []
-		failures           = []
+	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
+		file.write(json.dumps(metadata))
 
-		while total_processed < len(files):
-			while current_in_process < args.n_processes and idx < len(files):
-				res = pool.apply_async(processFile, (None, files[idx], args))
-				results.append(res)
-				idx                += 1
-				current_in_process += 1
-
-			done = []
-			for r in results:
-				if r.ready():
-					status, fname = r.get(0.01)
-					total_processed    += 1
-					current_in_process -= 1
-					pb.update(total_processed)
-					done.append(r)
-
-					if not status:
-						failures.append(fname)
-
-			for d in done:
-				results.remove(d)
-
-			time.sleep(0.001)
-	else:
-		for idx, file in enumerate(files):
-			img = cv2.imread(file)
-			processFile(img, file, args)
-			pb.update(idx + 1)
-
-	pb.finish()
-
-	if len(failures) > 0:
-		print("The following (%d) files were deleted."%len(failures))
-		for f in failures:
-			print("     %s"%f)
+	imageProcessor.buildDatabase(args)
