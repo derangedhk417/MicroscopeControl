@@ -23,6 +23,7 @@ import numpy             as np
 import matplotlib.pyplot as plt
 import sqlite3           as sql
 
+from datetime        import datetime
 from multiprocessing import Pool
 from ImageProcessing import processFile
 from Progress        import ProgressBar
@@ -51,7 +52,7 @@ def preprocess(args_specification):
 class MultiProcessImageProcessor:
 	def __init__(self, image_dims, n_processes=8, metadata=None):
 		self.n_processes  = n_processes
-		self.pool         = Pool(args.n_processes)
+		self.pool         = Pool(n_processes)
 		self.metadata     = metadata
 
 		self.image_dims         = image_dims
@@ -66,7 +67,7 @@ class MultiProcessImageProcessor:
 		}
 
 	def addItem(self, item, bg, args):
-		res = self.pool.apply_async(processFile, (None, item, bg, self.image_dims, args))
+		res = self.pool.apply_async(processFile, (item, bg, self.image_dims, args))
 		self.results.append(res)
 		self.current_in_process += 1
 

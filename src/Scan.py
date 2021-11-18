@@ -28,7 +28,7 @@ from scipy.optimize     import curve_fit
 from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
 from multiprocessing    import Pool
-from ImageProcessing    import MultiProcessImageProcessor
+from ProcessScan        import MultiProcessImageProcessor
 from datetime           import datetime
 from skimage            import data, restoration, util
 
@@ -358,7 +358,7 @@ def validateArgs(args):
 			args_file = json.loads(file.read())
 		arg_dict = args.__dict__
 
-		for k, v in arg_dict:
+		for k, v in arg_dict.items():
 			if not k.startswith("_"):
 				if k in args_file:
 					if v is not None:
@@ -384,7 +384,7 @@ def validateArgs(args):
 	if isNoneOrMissing(args_file, "contrast_range"):
 		# Layer range must be specified and if it is, material_file must also be specified.
 		if isNoneOrMissing(args_file, "layer_range"):
-			raise Exception("contrast_range and layer_range parameter missing. " + _
+			raise Exception("contrast_range and layer_range parameter missing. " + \
 				"You must specify at least one.")
 		else:
 			if isNoneOrMissing(args_file, "material_file"):
@@ -399,7 +399,7 @@ if __name__ == '__main__':
 	# Argument Processing
 	#############################################
 
-	with open("_SmartScan.json", 'r') as file:
+	with open("_Scan.json", 'r') as file:
 		args_specification = json.loads(file.read())
 	args = preprocess(args_specification)
 	# We want to track every part of the scan in a meta data structure so that it can be refered to
@@ -440,6 +440,8 @@ if __name__ == '__main__':
 		min_val -= _buffer
 		max_val += _buffer
 
+		min_val = max(0.04, min_val)
+
 		args.contrast_range = [min_val, max_val]
 
 		meta_data['log'].append(
@@ -447,6 +449,8 @@ if __name__ == '__main__':
 				args.layer_range[0], args.layer_range[1], min_val, max_val
 			)
 		)
+
+		code.interact(local=locals())
 
 
 
@@ -458,6 +462,7 @@ if __name__ == '__main__':
 			args.n_processes, 
 			meta_data
 		)
+		print("Initialized image processor")
 
 	#############################################
 	# Scan Setup
@@ -643,6 +648,9 @@ if __name__ == '__main__':
 
 	# Start a coarse scan. We'll process each image as we acquire it and quickly decide whether or
 	# not the region warrants further inspection.
+	scan_w          = x_max - x_min
+	scan_h          = y_max - y_min
+	n_coarse_images = int(round((scan_w / coarse_w) * (scan_h / coarse_h)))
 	coarse_progress = ProgressBar("Coarse Scan", 18, n_coarse_images, 1, ea=20)
 
 	regions_of_interest  = []
@@ -740,6 +748,8 @@ if __name__ == '__main__':
 	image_idx = 0
 	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
 	for row in regions_of_interest:
+		if len(row) < 1:
+			continue
 		x0, y0 = row[0]
 		microscope.stage.moveTo(x0, y0)
 		microscope.focus.setFocus(

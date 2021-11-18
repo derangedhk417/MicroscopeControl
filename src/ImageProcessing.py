@@ -470,9 +470,10 @@ class ImageProcessor:
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
 def processFile(fname, bg, image_dims, args):
+	print("Processing file")
 	p = ImageProcessor(
 		args.material_file,
-		invert_contrast=args.invert_contrast,
+		invert_contrast=False,
 		bilateral_filter=[10, 50],
 		background=bg,
 		nearest=False,
