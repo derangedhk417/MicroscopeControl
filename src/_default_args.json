@@ -3,13 +3,13 @@
 		1.0, 
 		0.3947113834247017, 
 		0.3302160593356982, 
-		0.005
+		0.004
 	],
 	"coarse_zoom" : [
 		0.4235, 
 		1.183180280328661, 
 		0.989850169163847, 
-		0.001
+		0.0008
 	],
 	"material_file" : "calibration_data/_graphene_on_90nmSiO2_Silicon.json",
 	"n_processes"   : 8,

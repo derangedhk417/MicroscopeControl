@@ -90,7 +90,13 @@ def calibrateFocus(microscope, args, gfit=False, debug=False):
 		print("Please ensure that the sample is flat and level.")
 		exit()
 
-	return interp, res[0], res[1]
+	return interp, res[0], res[1], res[2]
+
+def getFocusInterpolation(mx, my, b):
+	def interp(X):
+		x, y = X
+		return mx*x + my*y + b
+	return interp
 
 def getRegionsOfInterest(img, bg, args, x0, y0):
 	fine_zoom,   fine_w,   fine_h,   fine_exposure   = args.fine_zoom
@@ -414,6 +420,7 @@ if __name__ == '__main__':
 	meta_data['processed_arguments'] = args.__dict__
 
 	if args.layer_range is not None:
+		args.n_layers_max = args.layer_range[1]
 		with open(args.material_file, 'r') as file:
 			material_file = json.loads(file.read())
 
@@ -440,7 +447,7 @@ if __name__ == '__main__':
 		min_val -= _buffer
 		max_val += _buffer
 
-		min_val = max(0.04, min_val)
+		min_val = max(0.07, min_val)
 
 		args.contrast_range = [min_val, max_val]
 
@@ -449,8 +456,7 @@ if __name__ == '__main__':
 				args.layer_range[0], args.layer_range[1], min_val, max_val
 			)
 		)
-
-		code.interact(local=locals())
+		print(args.contrast_range)
 
 
 
@@ -464,6 +470,8 @@ if __name__ == '__main__':
 		)
 		print("Initialized image processor")
 
+
+
 	#############################################
 	# Scan Setup
 	#############################################
@@ -474,9 +482,28 @@ if __name__ == '__main__':
 	else:
 		for f in os.listdir(args.output_directory):
 			p = os.path.join(args.output_directory, f)
-			if os.path.isfile(p):
-				print("The specified output directory is not empty.")
-				exit()
+			if "focus_calibration" not in p:
+				if os.path.isfile(p):
+					print("The specified output directory is not empty.")
+					if input("Proceed (y/n)? ").lower() == 'y':
+						break
+					else:
+						exit()
+
+	skip_focus   = False
+	focus_params = None
+	if args.saved_focus_timeout > 0:
+		# We need to see if there is a previous focus file in the output directory. If there is,
+		# then we ask the user if they want to use it.
+		fc_name = os.path.join(args.output_directory, "_focus_calibration.json")
+		if os.path.isfile(fc_name):
+			with open(fc_name, 'r') as file:
+				focus_calibration = json.loads(file.read())
+
+			if focus_calibration['args']['bounds'] == args.bounds:
+				if input("Previous Focus Calibration Found, Use It? (y/n)? ").lower() == 'y':
+					skip_focus   = True
+					focus_params = focus_calibration['focus_params']
 
 	# Estimate the size of the scanned area and process the limits arguments.
 	x_min, x_max, y_min, y_max = args.bounds
@@ -527,7 +554,21 @@ if __name__ == '__main__':
 	# Coarse Scan Initialization
 	#############################################
 
-	interp, mx, my = calibrateFocus(microscope, args, debug=False, gfit=False)
+	if not skip_focus:
+		interp, mx, my, b = calibrateFocus(microscope, args, debug=False, gfit=False)
+		focus_calibration = {
+			"args": {
+				"bounds" : args.bounds
+			},
+			"focus_params" : [mx, my, b]
+		}
+		fc_name = os.path.join(args.output_directory, "_focus_calibration.json")
+		with open(fc_name, 'w') as file:
+			file.write(json.dumps(focus_calibration))
+		print("Focus calibration file written.")
+	else:
+		interp = getFocusInterpolation(*focus_params)
+		mx, my, b = focus_params
 
 	# This is used to average multiple images together during the coarse scan.
 	def avgimg(n, ds):
@@ -709,7 +750,7 @@ if __name__ == '__main__':
 
 	microscope.focus.setZoom(fine_zoom)
 	microscope.camera.setExposure(fine_exposure)
-	interp, mx, my = calibrateFocus(microscope, args, debug=False)
+	interp, mx, my, b = calibrateFocus(microscope, args, debug=False)
 
 	total_images = sum([len(i) for i in regions_of_interest])
 
@@ -782,13 +823,11 @@ if __name__ == '__main__':
 				# The fine background as determined by this program needs to be supplied to the 
 				# image processor so it can correctly calculate optical contrast values.
 				imageProcessor.addItem(filename, fine_background, args)
+				#pass
 
 			fine_progress.update(image_idx + 1)
 
 	fine_progress.finish()
-
-	if process_images:
-		imageProcessor.waitForCompletion()
 
 	#############################################
 	# Cleanup
@@ -796,10 +835,36 @@ if __name__ == '__main__':
 
 	meta_data['end_time'] = str(datetime.now())
 
-	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
-		file.write(json.dumps(imageProcessor.getMetaData()))
+	# if process_images:
+	# 	pass
+	# 	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
+	# 		file.write(json.dumps(imageProcessor.getMetaData()))
 
-	imageProcessor.buildDatabase()
+	meta_data['processed_arguments'] = dict(meta_data['processed_arguments'])
+
+	# We need to strip all of the weird __*__ type stuff from this dictionary so that it can
+	# be json serialized.
+	processed_args = {}
+	for k, v in meta_data['processed_arguments'].items():
+		if not k.startswith("__"):
+			processed_args[k] = v
+
+	raw_args = {}
+	for k, v in meta_data['raw_arguments'].items():
+		if not k.startswith("__"):
+			raw_args[k] = v
+
+	meta_data['processed_arguments'] = processed_args
+	meta_data['raw_arguments']       = raw_args
+
+
+	with open(os.path.join(args.output_directory, "_scan.json"), 'w') as file:
+		file.write(json.dumps(meta_data))
+
+	if process_images:
+		imageProcessor.waitForCompletion()
+
+	imageProcessor.buildDatabase(args)
 
 	microscope.camera.endCapture()
 	cv2.destroyAllWindows()

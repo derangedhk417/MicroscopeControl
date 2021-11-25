@@ -1,4 +1,19 @@
+- Use the threshold values in material files
 - Document stuff
+- Make autofocus attempt to move around and find a better spot
 - Move the monolayer contrast calculator code into this repository.
 - Implement proper generation of optical parameter files.
 - Cleanup image processing code.
+
+
+Parts:
+
+ - Proper mount for fiber optic at the source
+ - C-MOUNT 1"-32 female adapted cage that can mount a dichroic
+   - Must have a male C-MOUNT 1"-32 on the other side, or I need to buy an adapter
+ - (2X) C-MOUNT 1"-32 male to regular lens tube male adapter
+   - One of these will be for screwing the camera in where the fiber would normally go during testing.
+ - XY adjustable tube-to-tube coupler
+ - Lockable iris
+ - screw in fiber couple (we already have one, but might want a better one)
+ - Dichroic, ideally with the flatest possible wavelength response

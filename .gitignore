@@ -9,6 +9,7 @@ src/data/*
 
 *quality_scan*
 src/pdms_001_graphene_scan_003
+src/2021-*
 
 # C extensions
 *.so

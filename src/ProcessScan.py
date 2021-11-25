@@ -11,6 +11,9 @@
 #              is linearly related to the number of subprocesses up to the number of
 #              cores on your systems CPU. 
 
+import sys
+sys.path.append("hardware_code")
+
 import code
 import sys
 import os
@@ -50,9 +53,14 @@ def preprocess(args_specification):
 # I know, weird name, but it does accurately and somewhat concisely describe what this code
 # does.
 class MultiProcessImageProcessor:
-	def __init__(self, image_dims, n_processes=8, metadata=None):
+	def __init__(self, image_dims, n_processes=8, metadata=None, max_layers=3):
 		self.n_processes  = n_processes
-		self.pool         = Pool(n_processes)
+
+		if self.n_processes == 1:
+			self.sync = True
+		else:
+			self.sync = False
+			self.pool         = Pool(n_processes)
 		self.metadata     = metadata
 
 		self.image_dims         = image_dims
@@ -67,12 +75,17 @@ class MultiProcessImageProcessor:
 		}
 
 	def addItem(self, item, bg, args):
-		res = self.pool.apply_async(processFile, (item, bg, self.image_dims, args))
-		self.results.append(res)
-		self.current_in_process += 1
+		if self.sync:
+			processFile(item, bg, self.image_dims, args)
+		else:
+			res = self.pool.apply_async(processFile, (item, bg, self.image_dims, args))
+			self.results.append(res)
+			self.current_in_process += 1
 
 
 	def waitForCompletion(self):
+		if self.sync:
+			return
 		pb = ProgressBar("Processing Images", 18, self.current_in_process, 1, ea=25)
 		processed = 0
 		while self.current_in_process > 0:
@@ -82,8 +95,6 @@ class MultiProcessImageProcessor:
 					status, files            = r.get(0.01)
 					self.total_processed    += 1
 					self.current_in_process -= 1
-
-					self.metadata['image_processing']['files'][files[0]] = files[1]
 					
 					processed += 1
 					pb.update(processed)
@@ -164,14 +175,14 @@ if __name__ == '__main__':
 	fine_bg_name = metadata['fine_background_file']
 	bg_image     = cv2.imread(fine_bg_name)
 
-	files = [entry['path'] for entry in metadata['image_files']]
+	files = [os.path.join(args.output_directory, entry['path']) for entry in metadata['image_files']]
 
 	print("Processing %d files using %d processes."%(
 		len(files), 
 		args.n_processes
 	))
 
-	imageProcessor = MultiProcessImageProcessor(args.image_dims, args.n_processes, metadata)
+	imageProcessor = MultiProcessImageProcessor(args.image_dims, args.n_processes, metadata, args.n_layers_max)
 	
 	for file in files:
 		imageProcessor.addItem(file, bg_image, args)

@@ -34,6 +34,11 @@ class ImageProcessor:
 		self.layer_contrast = np.array(raw_file['layers'])
 		self.thresholds     = raw_file['threshold']
 
+		if 'max_layers' in kwargs:
+			self.max_layers = kwargs['max_layers']
+		else:
+			self.max_layers = 3
+
 		self._createGaussianScoringFunctions()
 
 		if 'background' in kwargs:
@@ -107,6 +112,12 @@ class ImageProcessor:
 		else:
 			self.skip_channel = None
 
+		self.background = cv2.resize(self.background, (0, 0), 
+			fx=(1/self.downscale_factor), 
+			fy=(1/self.downscale_factor),
+			interpolation=cv2.INTER_NEAREST # This should keep overhead at a minimum.
+		)
+
 	# This will create a gaussian centered on each thickness value for each color channel. The 
 	# gaussian will be normalized and it's FWHM will be half the distance between itself and the
 	# next closest contrast value.
@@ -123,9 +134,9 @@ class ImageProcessor:
 
 			return parameters
 
-		r = getGaussianScoringFunctionsForChannel(self.layer_contrast[:, 2])
-		g = getGaussianScoringFunctionsForChannel(self.layer_contrast[:, 3])
-		b = getGaussianScoringFunctionsForChannel(self.layer_contrast[:, 4])
+		r = getGaussianScoringFunctionsForChannel(self.layer_contrast[:self.max_layers, 2])
+		g = getGaussianScoringFunctionsForChannel(self.layer_contrast[:self.max_layers, 3])
+		b = getGaussianScoringFunctionsForChannel(self.layer_contrast[:self.max_layers, 4])
 
 		self.gaussianScoringFunctions = [r, g, b]
 
@@ -133,6 +144,11 @@ class ImageProcessor:
 		for i in range(10):
 			img = cv2.bilateralFilter(img, 5, *self.bilateral_filter)
 			
+
+
+		# plt.imshow(img)
+		# plt.title("Bilateral Filtered")
+		# plt.show()
 
 		# Separate the channels.
 		B, G, R = img[:, :, 0], img[:, :, 1], img[:, :, 2]
@@ -154,6 +170,16 @@ class ImageProcessor:
 		G_con[G_con < self.thresholds['g']] = 0
 		B_con[B_con < self.thresholds['b']] = 0
 
+		# Here we use self.max_layers to eliminate data above a certain contrast level.
+		r_max = self.layer_contrast[self.max_layers, 2]
+		g_max = self.layer_contrast[self.max_layers, 3]
+		b_max = self.layer_contrast[self.max_layers, 4]
+
+		R_con[R_con > r_max] = 0
+		G_con[G_con > g_max] = 0
+		B_con[B_con > b_max] = 0
+
+
 		result = np.stack([R_con, G_con, B_con], axis=2)
 
 		# Return the contrast image.
@@ -165,9 +191,18 @@ class ImageProcessor:
 		# assume it's already properly loaded in BGR format.
 		img = cv2.imread(img)
 
+		# plt.imshow(img)
+		# plt.show()
+
 		if self.downscale_factor != 1:
 			# Downscale the image before processing.
 			img = cv2.resize(img, (0, 0), 
+				fx=(1/self.downscale_factor), 
+				fy=(1/self.downscale_factor),
+				interpolation=cv2.INTER_NEAREST # This should keep overhead at a minimum.
+			)
+
+			bg = cv2.resize(bg, (0, 0), 
 				fx=(1/self.downscale_factor), 
 				fy=(1/self.downscale_factor),
 				interpolation=cv2.INTER_NEAREST # This should keep overhead at a minimum.
@@ -178,14 +213,14 @@ class ImageProcessor:
 		# Here we calculate the contrast of all values in the image using a simple method.
 		contrast_img  = self.getContrastImg(img.copy())
 
-		if self.debug:
-			fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+		#if self.debug:
+		# fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 
-			ax1.imshow(contrast_img[:, :, 0])
-			ax2.imshow(contrast_img[:, :, 1])
-			ax3.imshow(contrast_img[:, :, 2])
+		# ax1.imshow(contrast_img[:, :, 0])
+		# ax2.imshow(contrast_img[:, :, 1])
+		# ax3.imshow(contrast_img[:, :, 2])
 
-			plt.show()
+		# plt.show()
 
 		# Here we convert the image with shape (h, w, 3) into an image with only one channel,
 		# where that channel is an integer corresponding to the index in the list of layers.
@@ -196,9 +231,13 @@ class ImageProcessor:
 			contrast_img, calc_disagreement=False
 		)
 
-		# code.interact(local=locals())
-		plt.imshow(layers)
-		plt.show()
+		# Here we perform a simple erode-dilate process to eliminate noise.
+
+		kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 1))
+		eroded = cv2.erode(layers, kernel)
+		layers = cv2.dilate(eroded, kernel)
+		# plt.imshow(layers)
+		# plt.show()
 
 		# Now that we have the layer data, we use it to create a mask where 1 corresponds to flake
 		# and 0 corresponds to background. We'll use this to contour each flake. This information
@@ -428,13 +467,13 @@ class ImageProcessor:
 			return scores
 
 		if nearest:
-			scores_r = scoreChannelNearest(contrast_img[:, :, 0], self.layer_contrast[:, 2])
-			scores_g = scoreChannelNearest(contrast_img[:, :, 1], self.layer_contrast[:, 3])
-			scores_b = scoreChannelNearest(contrast_img[:, :, 2], self.layer_contrast[:, 4])
+			scores_r = scoreChannelNearest(contrast_img[:, :, 2], self.layer_contrast[:self.max_layers, 2])
+			scores_g = scoreChannelNearest(contrast_img[:, :, 1], self.layer_contrast[:self.max_layers, 3])
+			scores_b = scoreChannelNearest(contrast_img[:, :, 0], self.layer_contrast[:self.max_layers, 4])
 		else:
-			scores_r = scoreChannel(contrast_img[:, :, 0], self.gaussianScoringFunctions[0])
+			scores_r = scoreChannel(contrast_img[:, :, 2], self.gaussianScoringFunctions[0])
 			scores_g = scoreChannel(contrast_img[:, :, 1], self.gaussianScoringFunctions[1])
-			scores_b = scoreChannel(contrast_img[:, :, 2], self.gaussianScoringFunctions[2])
+			scores_b = scoreChannel(contrast_img[:, :, 0], self.gaussianScoringFunctions[2])
 		
 
 		# Now we take argmax along the third  dimension for each in order to get an indexed
@@ -451,7 +490,7 @@ class ImageProcessor:
 			np.max(scores_b, axis=2)
 		], axis=2)
 		best         = np.argmax(scores, axis=2)
-		layers       = self.layer_contrast[:, 0]
+		layers       = self.layer_contrast[:self.max_layers, 0]
 		
 		results = cat_r.copy()
 		results[best == 0] = cat_r[best == 0]
@@ -470,19 +509,19 @@ class ImageProcessor:
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
 def processFile(fname, bg, image_dims, args):
-	print("Processing file")
 	p = ImageProcessor(
 		args.material_file,
+		max_layers=args.n_layers_max,
 		invert_contrast=False,
 		bilateral_filter=[10, 50],
 		background=bg,
 		nearest=False,
-		downscale_factor=2,
+		downscale_factor=4,
 		debug=False,
 		output_path=args.output_directory,
 		image_dims=image_dims
 	)
-	files = p.processImage(fname)
+	files = p.processImage(fname, bg)
 	return True, [fname, files]
 
 def calculateBackgroundColored(images):
