@@ -21,7 +21,9 @@ import cv2
 import json
 import threading
 import math
+import sqlite3            as sql
 import matplotlib.patches as patches
+
 
 from MicroscopeControl  import MicroscopeController
 from scipy.optimize     import curve_fit
@@ -31,6 +33,7 @@ from multiprocessing    import Pool
 from ProcessScan        import MultiProcessImageProcessor
 from datetime           import datetime
 from skimage            import data, restoration, util
+from shutil             import copyfile
 
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -862,9 +865,34 @@ if __name__ == '__main__':
 		file.write(json.dumps(meta_data))
 
 	if process_images:
-		imageProcessor.waitForCompletion()
+		try:
+			imageProcessor.waitForCompletion()
+		except Exception as ex:
+			code.interact(local=locals())
 
 	imageProcessor.buildDatabase(args)
+
+	print("Copying the most relevant files into a subdirectory . . . ")
+	dbname = os.path.join(args.output_directory, "_database.db")
+	con    = sql.connect(dbname)
+	cur    = con.cursor()
+
+	subdir = os.path.join(args.output_directory, "filtered_images")
+	if not os.path.exists(subdir):
+		os.mkdir(subdir)
+
+	filter_stmt = "WHERE L001_area > 25 order by L001_area DESC"
+	stmt        = "SELECT file FROM flakes " + filter_stmt
+	print("Filtering images with \"%s\""%stmt)
+	res = cur.execute(stmt)
+	for i, row in enumerate(res):
+		outfile = "%06d_%s"%(i, row[0])
+		outfile = os.path.join(subdir, outfile)
+
+		infile = os.path.join(args.output_directory, row[0])
+		copyfile(infile, outfile)
+
+	print("Copied %d files to %s"%(i, subdir))
 
 	microscope.camera.endCapture()
 	cv2.destroyAllWindows()

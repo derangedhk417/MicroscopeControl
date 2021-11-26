@@ -24,7 +24,7 @@
 			"spec"  : {
 				"dest"     : "n_processes",
 				"type"     : "int",
-				"default"  : 8,
+				"default"  : 1,
 				"help"     : "The number of processes to use when processing images. This value is ignored if no optical paramters are specified (since images won't be processed)."
 			}
 		},
