@@ -28,7 +28,7 @@ class MicroscopeShell(cmd.Cmd):
 			disable_camera=self.no_camera
 		)
 		if not no_camera:
-			self.microscope.camera.startCapture()
+			self.microscope.camera.start_capture()
 
 			self.stop = False
 			self.preview_thread = Thread(

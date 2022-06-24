@@ -8,7 +8,6 @@
 #              attempt to categorize them by their thickness.
 
 import sys
-sys.path.append("hardware_code")
 
 import matplotlib.pyplot as plt
 import numpy             as np
@@ -21,9 +20,9 @@ import json
 import math
 import sqlite3            as sql
 
-from MicroscopeControl  import MicroscopeController
+from microscope_control.hardware.microscope_control import MicroscopeController
 from scipy.optimize     import curve_fit
-from Progress           import ProgressBar
+from microscope_control.hardware.progress import ProgressBar
 from multiprocessing    import Pool
 from microscope_control.scanning.process_scan import MultiProcessImageProcessor
 from datetime           import datetime
@@ -47,6 +46,7 @@ def preprocess(args_specification):
 	args = parser.parse_args()
 
 	return args
+
 
 def calibrateFocus(microscope, args, gfit=False, debug=False):
 	focus_test_points = np.array([
@@ -88,11 +88,13 @@ def calibrateFocus(microscope, args, gfit=False, debug=False):
 
 	return interp, res[0], res[1], res[2]
 
+
 def getFocusInterpolation(mx, my, b):
 	def interp(X):
 		x, y = X
 		return mx*x + my*y + b
 	return interp
+
 
 def getRegionsOfInterest(img, bg, args, x0, y0):
 	fine_zoom,   fine_w,   fine_h,   fine_exposure   = args.fine_zoom
@@ -180,6 +182,7 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 
 	return regions
 
+
 def parabolicSubtract(img, n_fit=128):
 	def fit(X, mmx, mmy, mx, my, b):
 		y, x = X
@@ -210,6 +213,7 @@ def parabolicSubtract(img, n_fit=128):
 
 	return subtracted
 
+
 # Used for debugging purposes. Creates a 3d surface plot of an image.
 def plotImage(img, ds=20):
 	img = cv2.resize(img, (0, 0), fx=(1 / ds), fy=(1 / ds))
@@ -219,6 +223,7 @@ def plotImage(img, ds=20):
 	ax  = fig.gca(projection='3d')
 	ax.plot_surface(xx, yy, img ,rstride=1, cstride=1, cmap=plt.cm.jet, linewidth=0)
 	plt.show()
+
 
 def calculateBackgroundGreyscale(args, focus_interp, microscope):
 	x_min, x_max, y_min, y_max = args.bounds
@@ -268,6 +273,7 @@ def calculateBackgroundGreyscale(args, focus_interp, microscope):
 	# plotImage(background)
 	# code.interact(local=locals())
 	return background
+
 
 def calculateBackgroundColored(args, focus_interp, microscope):
 	x_min, x_max, y_min, y_max = args.bounds
@@ -348,6 +354,7 @@ def calculateBackgroundColored(args, focus_interp, microscope):
 	# plt.show()
 	# code.interact(local=locals())
 	return background
+
 
 # This function will process the args_file (if specified) and ensure that all required arguments
 # have been specified.
@@ -534,7 +541,7 @@ if __name__ == '__main__':
 
 	# Connect to the microscope hardware.
 	microscope = MicroscopeController(verbose=True)
-	microscope.camera.startCapture()
+	microscope.camera.start_capture()
 
 	# These values were determined to produce the best compromise between scan speed and image
 	# quality.

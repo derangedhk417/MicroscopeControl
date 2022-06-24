@@ -25,7 +25,7 @@ from MicroscopeControl import MicroscopeController
 
 # Setting verbose=True will cause connection information to print
 # to the console while the controller is attempting to connect.
-microscope = MicroscopeController(verbose=True) 
+microscope = MicroscopeController(verbose=True)
 
 # After this call, the x and y axes of the stage will take 1500ms to
 # Accelerate to their maximum speed.
@@ -45,7 +45,7 @@ microscope.stage.setFocus(0.5)
 microscope.stage.setZoom(1.0)
 
 # Put the camera in capture mode.
-microscope.camera.startCapture()
+microscope.camera.start_capture()
 
 # Turn on auto-exposure adjustment for the camera.
 microscope.camera.enableAutoExposure()
@@ -60,6 +60,7 @@ microscope.camera.disableAutoExposure()
 # Turn off capture mode.
 microscope.camera.endCapture()
 
+
 # Move the stage, but return immediately and call a callback function when
 # the stage finishes moving.
 
@@ -67,7 +68,8 @@ microscope.camera.endCapture()
 def done():
     print("Done moving")
     # Do Something?
-   
+
+
 microscope.stage.moveTo(30, 30, callback=done)
 ```
 

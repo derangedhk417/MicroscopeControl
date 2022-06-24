@@ -5,6 +5,8 @@ requires = [
     "scipy",
     "matplotlib",
     "alive_progress",
-    "opencv-python"
+    "opencv-python",
+    "pixelinkWrapper",
+    "pyserial"
 ]
 build-backend = "setuptools.build_meta"

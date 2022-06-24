@@ -11,6 +11,7 @@ import code
 
 from queue import SimpleQueue, Empty
 
+
 # This handles the motion of the motorized stage as well as reading
 # data from the stage (in order to determine stage position).
 # Long running operations have an optional parameter called "callback".
@@ -361,6 +362,7 @@ def autoConnect():
 			raise ex
 
 	return None
+
 
 if __name__ == '__main__':
 	port       = sys.argv[1]

@@ -21,6 +21,7 @@ import cv2
 
 from scipy.interpolate import interp1d
 
+
 class ImageProcessor:
 	# The material file argument should point to a json file containing information about the camera
 	# system and the materials being imaged. The most important information in this file is the 
@@ -508,6 +509,7 @@ class ImageProcessor:
 
 		return [layers, disagreement, [scores_r, scores_g, scores_b]]
 
+
 def processFile(fname, bg, image_dims, args):
 	p = ImageProcessor(
 		args.material_file,
@@ -523,6 +525,7 @@ def processFile(fname, bg, image_dims, args):
 	)
 	files = p.processImage(fname, bg)
 	return True, [fname, files]
+
 
 def calculateBackgroundColored(images):
 	imgs_r_arr = [i[:, :, 2] for i in images]
@@ -575,6 +578,7 @@ def calculateBackgroundColored(images):
 	ax3.imshow(images[0] - background)
 	plt.show()
 	return background
+
 
 if __name__ == '__main__':
 	fnames = [

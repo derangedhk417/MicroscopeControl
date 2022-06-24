@@ -12,7 +12,6 @@
 #              cores on your systems CPU. 
 
 import sys
-sys.path.append("hardware_code")
 
 import os
 import time
@@ -23,8 +22,9 @@ import sqlite3           as sql
 
 from datetime        import datetime
 from multiprocessing import Pool
-from src.microscope_control.image_processing import processFile
-from Progress        import ProgressBar
+from microscope_control.image_processing.image_processing import processFile
+from microscope_control.hardware.progress import ProgressBar
+
 
 # Process the command line arguments supplied to the program.
 def preprocess(args_specification):

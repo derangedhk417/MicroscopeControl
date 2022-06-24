@@ -298,7 +298,7 @@ class userInterface(BoxLayout):
                 self.microscope_loaded = True
                 self.microscope.camera.enableLowRes()
                 self.accordion.setMicroscope(self.microscope)
-                self.microscope.camera.startCapture()
+                self.microscope.camera.start_capture()
 
             if self.microscope_loaded:
                 img = self.microscope.camera.getFrame()

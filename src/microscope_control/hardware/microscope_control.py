@@ -108,7 +108,7 @@ class MicroscopeController:
 		self.focus.setFocusInitialVelocity(50)
 		self.focus.setFocusMaxVelocity(500)
 
-		self.camera.startCapture()
+		self.camera.start_capture()
 
 		if autoExpose:
 			self.camera.enableAutoExposure()
@@ -237,7 +237,7 @@ if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 	import sys
 	def showimg():
-		microscope.camera.startCapture()
+		microscope.camera.start_capture()
 		img = microscope.camera.getFrame(convert=True)
 		plt.imshow(img)
 		plt.show()

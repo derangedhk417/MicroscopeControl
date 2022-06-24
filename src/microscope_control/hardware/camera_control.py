@@ -14,6 +14,7 @@ import code
 import time
 import atexit
 
+
 # Default resolution for our camera is: 2448 x 2048
 class CameraController:
 	def __init__(self):
@@ -28,7 +29,7 @@ class CameraController:
 		self.current_res           = (2048, 2448, 3)
 
 	# This needs to be called before capturing images from the camera.
-	def startCapture(self):
+	def start_capture(self):
 		ret = PxLApi.setStreamState(
 			self.camera_handle, 
 			PxLApi.StreamState.START
@@ -74,7 +75,7 @@ class CameraController:
 
 		self.current_res = (2048 // 4, 2448 // 4, 3)
 
-		self.startCapture()
+		self.start_capture()
 
 	def disableLowRes(self):
 		ret = PxLApi.getFeature(self.camera_handle, PxLApi.FeatureId.PIXEL_ADDRESSING)
@@ -102,7 +103,7 @@ class CameraController:
 
 		self.current_res = (2048, 2448, 3)
 
-		self.startCapture()
+		self.start_capture()
 
 	# Turns on automatic exposure adjustment.
 	def enableAutoExposure(self):
