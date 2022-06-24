@@ -21,7 +21,7 @@ from threading import Thread
 from kivy.uix.gridlayout import GridLayout
 
 import sys
-sys.path.append("..\\src")
+sys.path.append("../../src")
 from MicroscopeControl import MicroscopeController
 from CustomBoxLayout   import CustomBoxLayout
 from ImageDisplay      import ImageDisplay

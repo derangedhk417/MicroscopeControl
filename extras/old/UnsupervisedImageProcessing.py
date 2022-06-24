@@ -5,7 +5,7 @@
 #              Functionality includes training a model with images that have
 #              flakes of known thicknesses, saving a model, loading a model and
 #              using it to classify new images of the same material. 
-#              This code is meant to be called from the Scan.py tool, but it can
+#              This code is meant to be called from the scan.py tool, but it can
 #              also be run directly at the command line in order to debug it,
 #              train a new model or classify a set of images that have not 
 #              already been classified.

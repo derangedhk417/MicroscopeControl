@@ -501,7 +501,7 @@ if __name__ == '__main__':
 	# subsequent layer calculations.
 	calculator = ContrastCalculatorLoader(
 		["materials/graphene.csv", "materials/quartz_thin_film.csv", "materials/silicon.csv"],
-		"cameras/IMX264.csv",
+        "cameras/IMX264.csv",
 		4000,
 		0.1,
 		heights=[3.34e-10, 90e-9],
@@ -525,7 +525,7 @@ if __name__ == '__main__':
 	# Here we initialize another calculator with c-Plane HOPG.
 	calculator = ContrastCalculatorLoader(
 		["materials/HOPG_c_plane.csv", "materials/quartz_thin_film.csv", "materials/silicon.csv"],
-		"cameras/IMX264.csv",
+        "cameras/IMX264.csv",
 		4000,
 		0.1,
 		heights=[3.34e-10, 90e-9],

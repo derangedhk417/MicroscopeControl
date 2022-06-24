@@ -1,6 +1,6 @@
 # Author:      Adam Robinson
 # Description: This program takes a directory of images that have already
-#              been processed by ScanProcessing.py or Scan.py and summarizes
+#              been processed by ScanProcessing.py or scan.py and summarizes
 #              the distribution of flake sizes and flake contrast values.
 #              The current plan is to add flake library viewing functionality
 #              to this program. This will include allowing a user to specify

@@ -1,0 +1,10 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "alive_progress",
+    "opencv-python"
+]
+build-backend = "setuptools.build_meta"

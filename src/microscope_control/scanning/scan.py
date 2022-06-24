@@ -13,29 +13,22 @@ sys.path.append("hardware_code")
 import matplotlib.pyplot as plt
 import numpy             as np
 
-import time
 import code
 import argparse
 import os
 import cv2
 import json
-import threading
 import math
 import sqlite3            as sql
-import matplotlib.patches as patches
-
 
 from MicroscopeControl  import MicroscopeController
 from scipy.optimize     import curve_fit
-from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
 from multiprocessing    import Pool
-from ProcessScan        import MultiProcessImageProcessor
+from microscope_control.scanning.process_scan import MultiProcessImageProcessor
 from datetime           import datetime
-from skimage            import data, restoration, util
 from shutil             import copyfile
 
-from mpl_toolkits.mplot3d import Axes3D
 
 def preprocess(args_specification):
 	parser = argparse.ArgumentParser(description=args_specification['description'])

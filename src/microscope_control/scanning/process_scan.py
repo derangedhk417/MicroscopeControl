@@ -1,5 +1,5 @@
 # Author:      Adam Robinson
-# Description: This file contains the logic used by Scan.py to process images
+# Description: This file contains the logic used by scan.py to process images
 #              as they are acquired. It can also be run as a standalone command
 #              line program to process a folder of images that has not yet been
 #              processed. This program will move images to a folder called 
@@ -14,21 +14,16 @@
 import sys
 sys.path.append("hardware_code")
 
-import code
-import sys
 import os
 import time
 import cv2
 import argparse
 import json
-import shutil
-import numpy             as np
-import matplotlib.pyplot as plt
 import sqlite3           as sql
 
 from datetime        import datetime
 from multiprocessing import Pool
-from ImageProcessing import processFile
+from src.microscope_control.image_processing import processFile
 from Progress        import ProgressBar
 
 # Process the command line arguments supplied to the program.

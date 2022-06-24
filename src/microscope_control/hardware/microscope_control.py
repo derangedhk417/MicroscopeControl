@@ -4,13 +4,13 @@
 #              class that performs all of the relevant work related to controlling
 #              the microscope. 
 
-from CameraControl  import CameraController
-from FocusControl   import FocusController
-from StageControl   import StageController
-from FocusControl   import autoConnect     as getFocusController
-from StageControl   import autoConnect     as getStageController
+from camera_control  import CameraController
+from focus_control   import FocusController
+from stage_control   import StageController
+from focus_control   import autoConnect     as getFocusController
+from stage_control   import autoConnect     as getStageController
 from scipy.optimize import curve_fit
-from Progress       import ProgressBar
+from progress       import ProgressBar
 
 import time
 import code
